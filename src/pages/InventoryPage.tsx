@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useRestaurantStore } from '@/store/restaurantStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, Plus, Pencil, Package, AlertTriangle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -64,30 +65,38 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-3">
-          {products.map((p) => {
-            const isLow = p.quantity <= p.minStock;
-            return (
-              <Card key={p.id} className={isLow ? 'border-destructive/50' : ''}>
-                <CardContent className="flex items-center justify-between py-4">
-                  <div className="flex items-center gap-3">
-                    {isLow && <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />}
-                    <div>
-                      <p className="font-semibold">{p.name}</p>
-                      <p className="text-sm text-muted-foreground">Min stock: {p.minStock} {p.unit}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-lg font-bold ${isLow ? 'text-destructive' : 'text-primary'}`}>
-                      {p.quantity} {p.unit}
-                    </span>
-                    <Button variant="ghost" size="icon" onClick={() => startEdit(p)}><Pencil className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => deleteProduct(p.id)}><Trash2 className="w-4 h-4" /></Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Quantity</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Min Stock</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {products.map((p) => {
+                const isLow = p.quantity <= p.minStock;
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-semibold flex items-center gap-2">
+                      {isLow && <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />}
+                      {p.name}
+                    </TableCell>
+                    <TableCell className={isLow ? 'text-destructive font-bold' : ''}>{p.quantity}</TableCell>
+                    <TableCell>{p.unit}</TableCell>
+                    <TableCell>{p.minStock}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" onClick={() => startEdit(p)}><Pencil className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => deleteProduct(p.id)}><Trash2 className="w-4 h-4" /></Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
