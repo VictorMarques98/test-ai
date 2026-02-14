@@ -16,6 +16,7 @@ import {
 	ChevronDown,
 	ChevronUp,
 	Edit,
+	UserPlus,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 export default function OrdersPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { orders, dishes, products, clients, addOrder, updateOrder, confirmOrder, deleteOrder } =
+	const { orders, dishes, products, clients, addOrder, updateOrder, confirmOrder, deleteOrder, addClient } =
 		useRestaurantStore();
 	const [open, setOpen] = useState(false);
 	const [items, setItems] = useState<{ dishId: string; quantity: number; size: "small" | "medium" | "large" }[]>([]);
@@ -33,8 +34,12 @@ export default function OrdersPage() {
 	const [description, setDescription] = useState<string>("");
 	const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
+	// Client form states
+	const [clientModalOpen, setClientModalOpen] = useState(false);
+	const [clientForm, setClientForm] = useState({ name: "", phone: "", email: "", description: "" });
+
 	// Filter states
-	const [filtersExpanded, setFiltersExpanded] = useState(true);
+	const [filtersExpanded, setFiltersExpanded] = useState(false);
 	const [filterStatus, setFilterStatus] = useState<string>("all");
 	const [filterClient, setFilterClient] = useState<string>("all");
 	const [filterOrderNumber, setFilterOrderNumber] = useState<string>("");
@@ -92,8 +97,22 @@ export default function OrdersPage() {
 		setOpen(true);
 	};
 
-	const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || "Unknown";
-	const getClientName = (id?: string) => (id ? clients.find((c) => c.id === id)?.name || "Unknown" : "—");
+	const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || "Desconhecido";
+	const getClientName = (id?: string) => (id ? clients.find((c) => c.id === id)?.name || "Desconhecido" : "—");
+
+	const handleAddClient = () => {
+		const data = {
+			name: clientForm.name.trim(),
+			phone: clientForm.phone.trim(),
+			email: clientForm.email.trim(),
+			description: clientForm.description.trim(),
+		};
+		if (!data.name) return;
+		const newClientId = addClient(data);
+		setSelectedClientId(newClientId);
+		setClientForm({ name: "", phone: "", email: "", description: "" });
+		setClientModalOpen(false);
+	};
 
 	const calculateOrderTotal = (orderItems: typeof items) => {
 		return orderItems.reduce((total, item) => {
@@ -201,25 +220,90 @@ export default function OrdersPage() {
 								<DialogTitle>{editingOrderId ? "Editar Pedido" : "Novo pedido"}</DialogTitle>
 							</DialogHeader>
 							<div className="space-y-4 mt-2">
-								{clients.length > 0 && (
-									<div className="space-y-1.5">
-										<label className="text-sm font-medium">Cliente</label>
-										<Select value={selectedClientId} onValueChange={setSelectedClientId}>
-											<SelectTrigger>
-												<SelectValue placeholder="Select a client (optional)" />
-											</SelectTrigger>
-											<SelectContent>
-												{clients.map((c) => (
-													<SelectItem key={c.id} value={c.id}>
-														{c.name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-									</div>
-								)}
 								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Descrição (opcional)</label>
+									<div className="flex items-center justify-between">
+										<label className="text-sm font-medium">Cliente</label>
+										<Dialog open={clientModalOpen} onOpenChange={setClientModalOpen}>
+											<DialogTrigger asChild>
+												<Button variant="ghost" size="sm" className="h-7 text-xs">
+													<UserPlus className="w-3 h-3 mr-1" />
+													Novo Cliente
+												</Button>
+											</DialogTrigger>
+											<DialogContent>
+												<DialogHeader>
+													<DialogTitle>Novo Cliente</DialogTitle>
+												</DialogHeader>
+												<div className="space-y-4 mt-2">
+													<div className="space-y-1.5">
+														<label className="text-sm font-medium">Nome</label>
+														<Input
+															placeholder="Nome do cliente"
+															value={clientForm.name}
+															onChange={(e) =>
+																setClientForm({ ...clientForm, name: e.target.value })
+															}
+														/>
+													</div>
+													<div className="space-y-1.5">
+														<label className="text-sm font-medium">Telefone</label>
+														<Input
+															placeholder="Telefone"
+															value={clientForm.phone}
+															onChange={(e) =>
+																setClientForm({ ...clientForm, phone: e.target.value })
+															}
+														/>
+													</div>
+													<div className="space-y-1.5">
+														<label className="text-sm font-medium">Email</label>
+														<Input
+															placeholder="Email"
+															type="email"
+															value={clientForm.email}
+															onChange={(e) =>
+																setClientForm({ ...clientForm, email: e.target.value })
+															}
+														/>
+													</div>
+													<div className="space-y-1.5">
+														<label className="text-sm font-medium">
+															Observação do cliente (opcional)
+														</label>
+														<textarea
+															className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+															placeholder="Adicione notas ou informações sobre o cliente..."
+															value={clientForm.description}
+															onChange={(e) =>
+																setClientForm({
+																	...clientForm,
+																	description: e.target.value,
+																})
+															}
+														/>
+													</div>
+													<Button className="w-full" onClick={handleAddClient}>
+														Adicionar Cliente
+													</Button>
+												</div>
+											</DialogContent>
+										</Dialog>
+									</div>
+									<Select value={selectedClientId} onValueChange={setSelectedClientId}>
+										<SelectTrigger>
+											<SelectValue placeholder="Selecione um cliente (opcional)" />
+										</SelectTrigger>
+										<SelectContent>
+											{clients.map((c) => (
+												<SelectItem key={c.id} value={c.id}>
+													{c.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Observaçǎo do pedido (opcional)</label>
 									<textarea
 										className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 										placeholder="Adicione observações ou instruções especiais..."
@@ -235,6 +319,16 @@ export default function OrdersPage() {
 									</Button>
 								</div>
 								<div className="space-y-2">
+									{items.length > 0 && (
+										<div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-2">
+											<span className="text-xs font-medium text-muted-foreground">Prato</span>
+											<span className="text-xs font-medium text-muted-foreground w-24">
+												Tamanho
+											</span>
+											<span className="text-xs font-medium text-muted-foreground w-20">Qtd</span>
+											<span className="w-10"></span>
+										</div>
+									)}
 									{items.map((item, idx) => (
 										<div key={idx} className="flex items-center gap-2">
 											<Select
@@ -286,12 +380,12 @@ export default function OrdersPage() {
 								{feasibility && feasibility.shortages.length > 0 && (
 									<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
 										<div className="flex items-center gap-2 text-destructive font-semibold text-sm">
-											<AlertTriangle className="w-4 h-4" /> Inventory Shortage
+											<AlertTriangle className="w-4 h-4" /> Falta de Estoque
 										</div>
 										{feasibility.shortages.map((s, i) => (
 											<p key={i} className="text-xs text-destructive/80">
-												{s.product.name}: need {s.needed} {s.product.unit}, only {s.available}{" "}
-												available
+												{s.product.name}: precisa {s.needed} {s.product.unit}, apenas{" "}
+												{s.available} disponível
 											</p>
 										))}
 									</div>
@@ -316,7 +410,7 @@ export default function OrdersPage() {
 								)}
 
 								<Button className="w-full" onClick={handleSubmit} disabled={items.length === 0}>
-									{editingOrderId ? "Atualizar Pedido" : "Place Order"}
+									{editingOrderId ? "Atualizar Pedido" : "Criar Pedido"}
 								</Button>
 							</div>
 						</DialogContent>

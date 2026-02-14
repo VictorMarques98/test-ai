@@ -71,7 +71,7 @@ export default function DishesPage() {
 		setIngredients(ingredients.filter((_, i) => i !== idx));
 	};
 
-	const getProductName = (id: string) => products.find((p) => p.id === id)?.name || "Unknown";
+	const getProductName = (id: string) => products.find((p) => p.id === id)?.name || "Desconhecido";
 	const getProductUnit = (id: string) => products.find((p) => p.id === id)?.unit || "";
 
 	return (
@@ -97,50 +97,60 @@ export default function DishesPage() {
 						<DialogTrigger asChild>
 							<Button size="lg" className="shadow-lg" disabled={products.length === 0}>
 								<Plus className="w-4 h-4 mr-2" />
-								{products.length === 0 ? "Add products first" : "New Dish"}
+								{products.length === 0 ? "Adicione produtos primeiro" : "Novo Prato"}
 							</Button>
 						</DialogTrigger>
 						<DialogContent className="max-w-lg">
 							<DialogHeader>
-								<DialogTitle>{editId ? "Edit Dish" : "New Dish"}</DialogTitle>
+								<DialogTitle>{editId ? "Editar Prato" : "Novo Prato"}</DialogTitle>
 							</DialogHeader>
 							<div className="space-y-4 mt-2">
-								<Input placeholder="Dish name" value={name} onChange={(e) => setName(e.target.value)} />
-								<div className="grid grid-cols-3 gap-2">
-									<div className="space-y-1.5">
-										<label className="text-xs font-medium text-muted-foreground">Pequena</label>
-										<Input
-											type="number"
-											placeholder="$"
-											value={priceSmall}
-											onChange={(e) => setPriceSmall(e.target.value)}
-										/>
-									</div>
-									<div className="space-y-1.5">
-										<label className="text-xs font-medium text-muted-foreground">Media</label>
-										<Input
-											type="number"
-											placeholder="$"
-											value={priceMedium}
-											onChange={(e) => setPriceMedium(e.target.value)}
-										/>
-									</div>
-									<div className="space-y-1.5">
-										<label className="text-xs font-medium text-muted-foreground">Grande</label>
-										<Input
-											type="number"
-											placeholder="$"
-											value={priceLarge}
-											onChange={(e) => setPriceLarge(e.target.value)}
-										/>
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Nome do Prato</label>
+									<Input
+										placeholder="Nome do prato"
+										value={name}
+										onChange={(e) => setName(e.target.value)}
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Preços por Tamanho</label>
+									<div className="grid grid-cols-3 gap-2">
+										<div className="space-y-1.5">
+											<label className="text-xs font-medium text-muted-foreground">Pequeno</label>
+											<Input
+												type="number"
+												placeholder="$"
+												value={priceSmall}
+												onChange={(e) => setPriceSmall(e.target.value)}
+											/>
+										</div>
+										<div className="space-y-1.5">
+											<label className="text-xs font-medium text-muted-foreground">Medio</label>
+											<Input
+												type="number"
+												placeholder="$"
+												value={priceMedium}
+												onChange={(e) => setPriceMedium(e.target.value)}
+											/>
+										</div>
+										<div className="space-y-1.5">
+											<label className="text-xs font-medium text-muted-foreground">Grande</label>
+											<Input
+												type="number"
+												placeholder="$"
+												value={priceLarge}
+												onChange={(e) => setPriceLarge(e.target.value)}
+											/>
+										</div>
 									</div>
 								</div>
 								<div>
 									<div className="flex items-center justify-between mb-2">
-										<p className="text-sm font-medium">Ingredients</p>
+										<p className="text-sm font-medium">Ingredientes</p>
 										<Button variant="outline" size="sm" onClick={addIngredient}>
 											<Plus className="w-3 h-3 mr-1" />
-											Add
+											Adicionar
 										</Button>
 									</div>
 									<div className="space-y-2">
@@ -188,10 +198,11 @@ export default function DishesPage() {
 											<AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
 											<div className="flex-1">
 												<AlertDescription className="text-amber-800 dark:text-amber-300 font-medium">
-													All price fields are required
+													Todos os campos de preço são obrigatórios
 												</AlertDescription>
 												<p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-													Please enter a price for Small, Medium, and Large sizes to continue.
+													Por favor, insira um preço para os tamanhos Pequeno, Médio e Grande
+													para continuar.
 												</p>
 											</div>
 										</div>
@@ -207,7 +218,7 @@ export default function DishesPage() {
 										!priceMedium ||
 										!priceLarge
 									}>
-									{editId ? "Update" : "Create Dish"}
+									{editId ? "Atualizar" : "Criar Prato"}
 								</Button>
 							</div>
 						</DialogContent>
@@ -219,7 +230,7 @@ export default function DishesPage() {
 				<Card>
 					<CardContent className="flex flex-col items-center justify-center py-12">
 						<UtensilsCrossed className="w-12 h-12 text-muted-foreground mb-4" />
-						<p className="text-muted-foreground">No dishes yet. Create your first dish.</p>
+						<p className="text-muted-foreground">Nenhum prato ainda. Crie seu primeiro prato.</p>
 					</CardContent>
 				</Card>
 			) : (
@@ -233,7 +244,7 @@ export default function DishesPage() {
 											<p className="font-bold text-lg truncate">{d.name}</p>
 											<div className="flex gap-2 mt-1 text-sm">
 												<span className="text-muted-foreground">
-													S:{" "}
+													P:{" "}
 													<span className="font-bold text-primary">
 														${d.priceSmall.toFixed(2)}
 													</span>
@@ -245,7 +256,7 @@ export default function DishesPage() {
 													</span>
 												</span>
 												<span className="text-muted-foreground">
-													L:{" "}
+													G:{" "}
 													<span className="font-bold text-primary">
 														${d.priceLarge.toFixed(2)}
 													</span>
@@ -268,7 +279,7 @@ export default function DishesPage() {
 								</div>
 								<div className="p-4 flex-1 overflow-auto">
 									<p className="text-xs font-medium text-muted-foreground mb-2 uppercase">
-										Ingredients
+										Ingredientes
 									</p>
 									<div className="flex flex-wrap gap-1.5">
 										{d.ingredients.map((ing, i) => (

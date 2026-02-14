@@ -19,7 +19,7 @@ interface RestaurantStore {
 	updateOrderStatus: (id: string, status: Order["status"]) => void;
 	confirmOrder: (id: string) => void;
 	deleteOrder: (id: string) => void;
-	addClient: (c: Omit<Client, "id">) => void;
+	addClient: (c: Omit<Client, "id">) => string;
 	updateClient: (id: string, c: Partial<Client>) => void;
 	deleteClient: (id: string) => void;
 }
@@ -91,7 +91,11 @@ export const useRestaurantStore = create<RestaurantStore>()(
 				});
 			},
 			deleteOrder: (id) => set((s) => ({ orders: s.orders.filter((o) => o.id !== id) })),
-			addClient: (c) => set((s) => ({ clients: [...s.clients, { ...c, id: genId() }] })),
+			addClient: (c) => {
+				const newId = genId();
+				set((s) => ({ clients: [...s.clients, { ...c, id: newId }] }));
+				return newId;
+			},
 			updateClient: (id, c) =>
 				set((s) => ({ clients: s.clients.map((x) => (x.id === id ? { ...x, ...c } : x)) })),
 			deleteClient: (id) => set((s) => ({ clients: s.clients.filter((x) => x.id !== id) })),

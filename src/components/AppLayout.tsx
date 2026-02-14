@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { LayoutDashboard, Package, UtensilsCrossed, ClipboardList, Users } from "lucide-react";
+import { LayoutDashboard, Package, UtensilsCrossed, ClipboardList, Users, BarChart3 } from "lucide-react";
 import LowStockBanner from "./LowStockBanner";
 
 const links = [
@@ -8,6 +8,7 @@ const links = [
 	{ to: "/dishes", label: "Cardapio", icon: UtensilsCrossed },
 	{ to: "/orders", label: "Pedidos", icon: ClipboardList },
 	{ to: "/clients", label: "Clientes", icon: Users },
+	{ to: "/reports", label: "Relatórios", icon: BarChart3 },
 ];
 
 export default function AppLayout() {

@@ -1,20 +1,20 @@
-import { useState } from "react";
-import { useRestaurantStore } from "@/store/restaurantStore";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, Plus, Pencil, Package, AlertTriangle, TrendingDown, TrendingUp, DollarSign } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useRestaurantStore } from "@/store/restaurantStore";
+import { AlertTriangle, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 export default function InventoryPage() {
 	const { products, addProduct, updateProduct, deleteProduct, orders, dishes } = useRestaurantStore();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
-	const [form, setForm] = useState({ name: "", quantity: "", unit: "", minStock: "" });
+	const [form, setForm] = useState({ name: "", quantity: "", unit: "", minStock: "", buyPrice: "" });
 
 	const resetForm = () => {
-		setForm({ name: "", quantity: "", unit: "", minStock: "" });
+		setForm({ name: "", quantity: "", unit: "", minStock: "", buyPrice: "" });
 		setEditId(null);
 	};
 
@@ -24,6 +24,7 @@ export default function InventoryPage() {
 			quantity: Number(form.quantity),
 			unit: form.unit.trim(),
 			minStock: Number(form.minStock),
+			...(form.buyPrice && !isNaN(Number(form.buyPrice)) ? { buyPrice: Number(form.buyPrice) } : {}),
 		};
 		if (!data.name || isNaN(data.quantity)) return;
 		if (editId) {
@@ -37,7 +38,13 @@ export default function InventoryPage() {
 
 	const startEdit = (p: (typeof products)[0]) => {
 		setEditId(p.id);
-		setForm({ name: p.name, quantity: String(p.quantity), unit: p.unit, minStock: String(p.minStock) });
+		setForm({
+			name: p.name,
+			quantity: String(p.quantity),
+			unit: p.unit,
+			minStock: String(p.minStock),
+			buyPrice: p.buyPrice ? String(p.buyPrice) : "",
+		});
 		setOpen(true);
 	};
 
@@ -64,10 +71,6 @@ export default function InventoryPage() {
 		return product.quantity - usedQuantity;
 	};
 
-	const lowStockProducts = products.filter((p) => calculateCurrentQuantity(p.id) <= p.minStock);
-	const negativeStockProducts = products.filter((p) => calculateCurrentQuantity(p.id) < 0);
-	const totalProducts = products.length;
-
 	return (
 		<div className="space-y-6">
 			{/* Header Section */}
@@ -78,8 +81,8 @@ export default function InventoryPage() {
 							<Package className="w-8 h-8 text-primary" />
 						</div>
 						<div>
-							<h1 className="text-3xl font-bold text-white">Inventory Management</h1>
-							<p className="text-slate-300 mt-1">Track and manage your product stock levels</p>
+							<h1 className="text-3xl font-bold text-white">Controle de estoque</h1>
+							<p className="text-slate-300 mt-1">Gerencie seus ingredientes</p>
 						</div>
 					</div>
 					<Dialog
@@ -91,40 +94,62 @@ export default function InventoryPage() {
 						<DialogTrigger asChild>
 							<Button size="lg" className="shadow-lg">
 								<Plus className="w-4 h-4 mr-2" />
-								Add Product
+								Adicionar produto
 							</Button>
 						</DialogTrigger>
 						<DialogContent>
 							<DialogHeader>
-								<DialogTitle>{editId ? "Edit Product" : "New Product"}</DialogTitle>
+								<DialogTitle>{editId ? "Editar Produto" : "Novo Produto"}</DialogTitle>
 							</DialogHeader>
 							<div className="space-y-4 mt-2">
-								<Input
-									placeholder="Product name"
-									value={form.name}
-									onChange={(e) => setForm({ ...form, name: e.target.value })}
-								/>
-								<div className="grid grid-cols-2 gap-3">
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Nome do Produto</label>
 									<Input
-										type="number"
-										placeholder="Quantity"
-										value={form.quantity}
-										onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-									/>
-									<Input
-										placeholder="Unit (kg, L, pcs)"
-										value={form.unit}
-										onChange={(e) => setForm({ ...form, unit: e.target.value })}
+										placeholder="Nome do produto"
+										value={form.name}
+										onChange={(e) => setForm({ ...form, name: e.target.value })}
 									/>
 								</div>
-								<Input
-									type="number"
-									placeholder="Min stock alert"
-									value={form.minStock}
-									onChange={(e) => setForm({ ...form, minStock: e.target.value })}
-								/>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Quantidade</label>
+										<Input
+											type="number"
+											placeholder="Quantidade"
+											value={form.quantity}
+											onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+										/>
+									</div>
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Unidade</label>
+										<Input
+											placeholder="kg, L, un"
+											value={form.unit}
+											onChange={(e) => setForm({ ...form, unit: e.target.value })}
+										/>
+									</div>
+								</div>
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Estoque Mínimo</label>
+									<Input
+										type="number"
+										placeholder="Alerta de estoque mínimo"
+										value={form.minStock}
+										onChange={(e) => setForm({ ...form, minStock: e.target.value })}
+									/>
+								</div>
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Preço de Compra (opcional)</label>
+									<Input
+										type="number"
+										step="0.01"
+										placeholder="0.00"
+										value={form.buyPrice}
+										onChange={(e) => setForm({ ...form, buyPrice: e.target.value })}
+									/>
+								</div>
 								<Button className="w-full" onClick={handleSubmit}>
-									{editId ? "Update" : "Add Product"}
+									{editId ? "Atualizar" : "Adicionar Produto"}
 								</Button>
 							</div>
 						</DialogContent>
@@ -132,63 +157,14 @@ export default function InventoryPage() {
 				</div>
 			</div>
 
-			{/* Statistics Section */}
-			{products.length > 0 && (
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-					<Card>
-						<CardContent className="p-6">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm font-medium text-muted-foreground">Total Products</p>
-									<p className="text-3xl font-bold mt-2">{totalProducts}</p>
-								</div>
-								<div className="p-3 bg-primary/10 rounded-full">
-									<Package className="w-6 h-6 text-primary" />
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardContent className="p-6">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm font-medium text-muted-foreground">Low Stock Items</p>
-									<p className="text-3xl font-bold mt-2 text-amber-600 dark:text-amber-500">
-										{lowStockProducts.length}
-									</p>
-								</div>
-								<div className="p-3 bg-amber-500/10 rounded-full">
-									<TrendingDown className="w-6 h-6 text-amber-600 dark:text-amber-500" />
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardContent className="p-6">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm font-medium text-muted-foreground">Critical Stock</p>
-									<p className="text-3xl font-bold mt-2 text-destructive">
-										{negativeStockProducts.length}
-									</p>
-								</div>
-								<div className="p-3 bg-destructive/10 rounded-full">
-									<AlertTriangle className="w-6 h-6 text-destructive" />
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-				</div>
-			)}
-
 			{/* Table Section */}
 			{products.length === 0 ? (
 				<Card>
 					<CardContent className="flex flex-col items-center justify-center py-12">
 						<Package className="w-12 h-12 text-muted-foreground mb-4" />
-						<p className="text-muted-foreground">No products yet. Add your first product to get started.</p>
+						<p className="text-muted-foreground">
+							Nenhum produto ainda. Adicione seu primeiro produto para começar.
+						</p>
 					</CardContent>
 				</Card>
 			) : (
@@ -197,12 +173,12 @@ export default function InventoryPage() {
 						<Table>
 							<TableHeader>
 								<TableRow className="bg-muted/50">
-									<TableHead className="font-bold">Product</TableHead>
-									<TableHead className="font-bold">Stock Quantity</TableHead>
-									<TableHead className="font-bold">Current Qty</TableHead>
-									<TableHead className="font-bold">Unit</TableHead>
-									<TableHead className="font-bold">Min Stock</TableHead>
-									<TableHead className="text-right font-bold">Actions</TableHead>
+									<TableHead className="font-bold">Produto</TableHead>
+									<TableHead className="font-bold">Qtd. Estoque</TableHead>
+									<TableHead className="font-bold">Qtd. Atual</TableHead>
+									<TableHead className="font-bold">Estoque Mínimo</TableHead>
+									<TableHead className="font-bold">Preço de Compra</TableHead>
+									<TableHead className="text-right font-bold">Ações</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -220,7 +196,9 @@ export default function InventoryPage() {
 													{p.name}
 												</div>
 											</TableCell>
-											<TableCell className="font-medium">{p.quantity}</TableCell>
+											<TableCell className="font-medium">
+												{p.quantity} {p.unit}
+											</TableCell>
 											<TableCell>
 												<span
 													className={
@@ -230,11 +208,21 @@ export default function InventoryPage() {
 																? "px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-500 font-bold text-sm"
 																: "px-2 py-1 rounded-full bg-green-500/10 text-green-600 dark:text-green-500 font-semibold text-sm"
 													}>
-													{currentQty.toFixed(2)}
+													{currentQty.toFixed(2)} {p.unit}
 												</span>
+											</TableCell>{" "}
+											<TableCell className="text-muted-foreground">
+												{p.minStock} {p.unit}
 											</TableCell>
-											<TableCell className="text-muted-foreground">{p.unit}</TableCell>
-											<TableCell className="text-muted-foreground">{p.minStock}</TableCell>
+											<TableCell className="text-muted-foreground">
+												{p.buyPrice ? (
+													<span className="font-semibold text-green-600 dark:text-green-500">
+														${p.buyPrice.toFixed(2)}
+													</span>
+												) : (
+													<span className="text-muted-foreground/50">—</span>
+												)}
+											</TableCell>{" "}
 											<TableCell className="text-right">
 												<div className="flex items-center justify-end gap-1">
 													<Button

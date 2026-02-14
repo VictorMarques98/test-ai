@@ -58,7 +58,7 @@ export default function ClientsPage() {
 		setOpen(true);
 	};
 
-	const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || "Unknown";
+	const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || "Desconhecido";
 
 	const filteredClients = useMemo(() => {
 		const q = search.toLowerCase();
@@ -159,7 +159,9 @@ export default function ClientsPage() {
 					<CardContent className="flex flex-col items-center justify-center py-12">
 						<Users className="w-12 h-12 text-muted-foreground mb-4" />
 						<p className="text-muted-foreground">
-							{search ? "No clients match your search." : "No clients yet. Add your first client."}
+							{search
+								? "Nenhum cliente corresponde à sua busca."
+								: "Nenhum cliente ainda. Adicione seu primeiro cliente."}
 						</p>
 					</CardContent>
 				</Card>
@@ -271,7 +273,7 @@ export default function ClientsPage() {
 													<TableHeader>
 														<TableRow className="bg-slate-100 dark:bg-slate-800">
 															<TableHead className="font-semibold">Pedido #</TableHead>
-															<TableHead className="font-semibold">Items</TableHead>
+															<TableHead className="font-semibold">Itens</TableHead>
 															<TableHead className="font-semibold">Data</TableHead>
 															<TableHead className="font-semibold">Status</TableHead>
 														</TableRow>

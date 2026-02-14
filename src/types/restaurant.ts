@@ -4,6 +4,7 @@ export interface Product {
 	quantity: number;
 	unit: string;
 	minStock: number;
+	buyPrice?: number;
 }
 
 export interface Client {
