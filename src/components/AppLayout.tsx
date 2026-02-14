@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Package, UtensilsCrossed, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Package, UtensilsCrossed, ClipboardList, Users } from 'lucide-react';
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/dishes', label: 'Dishes', icon: UtensilsCrossed },
   { to: '/orders', label: 'Orders', icon: ClipboardList },
+  { to: '/clients', label: 'Clients', icon: Users },
 ];
 
 export default function AppLayout() {

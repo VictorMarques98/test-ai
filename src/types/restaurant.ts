@@ -6,6 +6,13 @@ export interface Product {
   minStock: number;
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+}
+
 export interface DishIngredient {
   productId: string;
   quantity: number;
@@ -26,6 +33,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   items: OrderItem[];
+  clientId?: string;
   createdAt: string;
   status: 'pending' | 'confirmed' | 'completed';
 }
