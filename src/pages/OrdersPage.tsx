@@ -46,6 +46,15 @@ export default function OrdersPage() {
 	const [filterDateFrom, setFilterDateFrom] = useState<string>("");
 	const [filterDateTo, setFilterDateTo] = useState<string>("");
 
+	// Handle opening modal from navigation
+	useEffect(() => {
+		const state = location.state as { openModal?: boolean } | null;
+		if (state?.openModal) {
+			setOpen(true);
+			window.history.replaceState({}, document.title);
+		}
+	}, [location.state]);
+
 	// Handle incoming filter from navigation
 	useEffect(() => {
 		const state = location.state as { filterOrderNumber?: string } | null;

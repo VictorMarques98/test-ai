@@ -17,7 +17,9 @@ export interface Client {
 
 export interface DishIngredient {
 	productId: string;
-	quantity: number;
+	quantitySmall: number;
+	quantityMedium: number;
+	quantityLarge: number;
 }
 
 export interface Dish {

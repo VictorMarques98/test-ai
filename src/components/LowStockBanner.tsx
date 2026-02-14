@@ -22,7 +22,13 @@ export default function LowStockBanner() {
 				if (dish) {
 					const ingredient = dish.ingredients.find((ing) => ing.productId === productId);
 					if (ingredient) {
-						usedQuantity += ingredient.quantity * item.quantity;
+						const ingredientQty =
+							item.size === "small"
+								? ingredient.quantitySmall
+								: item.size === "medium"
+									? ingredient.quantityMedium
+									: ingredient.quantityLarge;
+						usedQuantity += ingredientQty * item.quantity;
 					}
 				}
 			}

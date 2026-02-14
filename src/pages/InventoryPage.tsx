@@ -2,16 +2,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useRestaurantStore } from "@/store/restaurantStore";
 import { AlertTriangle, Package, Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 export default function InventoryPage() {
+	const location = useLocation();
 	const { products, addProduct, updateProduct, deleteProduct, orders, dishes } = useRestaurantStore();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
 	const [form, setForm] = useState({ name: "", quantity: "", unit: "", minStock: "", buyPrice: "" });
+
+	// Handle opening modal from navigation
+	useEffect(() => {
+		const state = location.state as { openModal?: boolean } | null;
+		if (state?.openModal) {
+			setOpen(true);
+			window.history.replaceState({}, document.title);
+		}
+	}, [location.state]);
 
 	const resetForm = () => {
 		setForm({ name: "", quantity: "", unit: "", minStock: "", buyPrice: "" });
@@ -62,7 +74,13 @@ export default function InventoryPage() {
 				if (dish) {
 					const ingredient = dish.ingredients.find((ing) => ing.productId === productId);
 					if (ingredient) {
-						usedQuantity += ingredient.quantity * item.quantity;
+						const ingredientQty =
+							item.size === "small"
+								? ingredient.quantitySmall
+								: item.size === "medium"
+									? ingredient.quantityMedium
+									: ingredient.quantityLarge;
+						usedQuantity += ingredientQty * item.quantity;
 					}
 				}
 			}
@@ -122,31 +140,45 @@ export default function InventoryPage() {
 									</div>
 									<div className="space-y-1.5">
 										<label className="text-sm font-medium">Unidade</label>
-										<Input
-											placeholder="kg, L, un"
-											value={form.unit}
-											onChange={(e) => setForm({ ...form, unit: e.target.value })}
-										/>
+										<Select value={form.unit} onValueChange={(v) => setForm({ ...form, unit: v })}>
+											<SelectTrigger>
+												<SelectValue placeholder="Selecione a unidade" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="kg">kg (quilograma)</SelectItem>
+												<SelectItem value="g">g (grama)</SelectItem>
+												<SelectItem value="L">L (litro)</SelectItem>
+												<SelectItem value="ml">ml (mililitro)</SelectItem>
+												<SelectItem value="un">un (unidade)</SelectItem>
+												<SelectItem value="cx">cx (caixa)</SelectItem>
+												<SelectItem value="pct">pct (pacote)</SelectItem>
+											</SelectContent>
+										</Select>
 									</div>
 								</div>
-								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Estoque Mínimo</label>
-									<Input
-										type="number"
-										placeholder="Alerta de estoque mínimo"
-										value={form.minStock}
-										onChange={(e) => setForm({ ...form, minStock: e.target.value })}
-									/>
-								</div>
-								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Preço de Compra (opcional)</label>
-									<Input
-										type="number"
-										step="0.01"
-										placeholder="0.00"
-										value={form.buyPrice}
-										onChange={(e) => setForm({ ...form, buyPrice: e.target.value })}
-									/>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="space-y-1.5 pr-2">
+										<label className="text-sm font-medium">Estoque Mínimo</label>
+										<div className="flex items-center gap-2">
+											<Input
+												type="number"
+												placeholder="Alerta de estoque mínimo"
+												value={form.minStock}
+												onChange={(e) => setForm({ ...form, minStock: e.target.value })}
+											/>
+											{form.unit && <p className="text-xs">{form.unit}</p>}
+										</div>
+									</div>
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Preço de Compra (opcional)</label>
+										<Input
+											type="number"
+											step="0.01"
+											placeholder="$ 0.00"
+											value={form.buyPrice}
+											onChange={(e) => setForm({ ...form, buyPrice: e.target.value })}
+										/>
+									</div>
 								</div>
 								<Button className="w-full" onClick={handleSubmit}>
 									{editId ? "Atualizar" : "Adicionar Produto"}

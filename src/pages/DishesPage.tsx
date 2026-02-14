@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useRestaurantStore } from "@/store/restaurantStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DishIngredient } from "@/types/restaurant";
 
 export default function DishesPage() {
+	const location = useLocation();
 	const { dishes, products, addDish, updateDish, deleteDish } = useRestaurantStore();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
@@ -18,6 +20,15 @@ export default function DishesPage() {
 	const [priceMedium, setPriceMedium] = useState("");
 	const [priceLarge, setPriceLarge] = useState("");
 	const [ingredients, setIngredients] = useState<DishIngredient[]>([]);
+
+	// Handle opening modal from navigation
+	useEffect(() => {
+		const state = location.state as { openModal?: boolean } | null;
+		if (state?.openModal) {
+			setOpen(true);
+			window.history.replaceState({}, document.title);
+		}
+	}, [location.state]);
 
 	const resetForm = () => {
 		setName("");
@@ -58,12 +69,15 @@ export default function DishesPage() {
 
 	const addIngredient = () => {
 		if (products.length === 0) return;
-		setIngredients([...ingredients, { productId: products[0].id, quantity: 1 }]);
+		setIngredients([
+			...ingredients,
+			{ productId: products[0].id, quantitySmall: 1, quantityMedium: 1, quantityLarge: 1 },
+		]);
 	};
 
 	const updateIngredient = (idx: number, field: keyof DishIngredient, value: string | number) => {
 		const updated = [...ingredients];
-		updated[idx] = { ...updated[idx], [field]: field === "quantity" ? Number(value) : value };
+		updated[idx] = { ...updated[idx], [field]: field.startsWith("quantity") ? Number(value) : value };
 		setIngredients(updated);
 	};
 
@@ -100,11 +114,11 @@ export default function DishesPage() {
 								{products.length === 0 ? "Adicione produtos primeiro" : "Novo Prato"}
 							</Button>
 						</DialogTrigger>
-						<DialogContent className="max-w-lg">
+						<DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
 							<DialogHeader>
 								<DialogTitle>{editId ? "Editar Prato" : "Novo Prato"}</DialogTitle>
 							</DialogHeader>
-							<div className="space-y-4 mt-2">
+							<div className="space-y-4 mt-2 overflow-y-auto px-2">
 								<div className="space-y-1.5">
 									<label className="text-sm font-medium">Nome do Prato</label>
 									<Input
@@ -153,39 +167,103 @@ export default function DishesPage() {
 											Adicionar
 										</Button>
 									</div>
-									<div className="space-y-2">
+									<div className="space-y-3">
 										{ingredients.map((ing, idx) => (
-											<div key={idx} className="flex items-center gap-2">
-												<Select
-													value={ing.productId}
-													onValueChange={(v) => updateIngredient(idx, "productId", v)}>
-													<SelectTrigger className="flex-1">
-														<SelectValue />
-													</SelectTrigger>
-													<SelectContent>
-														{products.map((p) => (
-															<SelectItem key={p.id} value={p.id}>
-																{p.name}
-															</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
-												<Input
-													type="number"
-													className="w-20"
-													value={ing.quantity}
-													onChange={(e) => updateIngredient(idx, "quantity", e.target.value)}
-												/>
-												<span className="text-xs text-muted-foreground w-8">
-													{getProductUnit(ing.productId)}
-												</span>
-												<Button
-													variant="ghost"
-													size="icon"
-													className="shrink-0"
-													onClick={() => removeIngredient(idx)}>
-													<X className="w-3 h-3" />
-												</Button>
+											<div key={idx} className="space-y-2 p-3 border rounded-lg bg-secondary/30">
+												<div className="flex items-center gap-2">
+													<Select
+														value={ing.productId}
+														onValueChange={(v) => updateIngredient(idx, "productId", v)}>
+														<SelectTrigger className="flex-1">
+															<SelectValue />
+														</SelectTrigger>
+														<SelectContent>
+															{products.map((p) => (
+																<SelectItem key={p.id} value={p.id}>
+																	{p.name}
+																</SelectItem>
+															))}
+														</SelectContent>
+													</Select>
+													<Button
+														variant="ghost"
+														size="icon"
+														className="shrink-0"
+														onClick={() => removeIngredient(idx)}>
+														<X className="w-4 h-4" />
+													</Button>
+												</div>
+												<div className="grid grid-cols-3 gap-2">
+													<div className="space-y-1">
+														<label className="text-xs font-medium text-muted-foreground">
+															Pequeno
+														</label>
+														<div className="flex items-center gap-1">
+															<Input
+																type="number"
+																step="0.1"
+																className="text-sm"
+																value={ing.quantitySmall}
+																onChange={(e) =>
+																	updateIngredient(
+																		idx,
+																		"quantitySmall",
+																		e.target.value,
+																	)
+																}
+															/>
+															<span className="text-xs text-muted-foreground min-w-8">
+																{getProductUnit(ing.productId)}
+															</span>
+														</div>
+													</div>
+													<div className="space-y-1">
+														<label className="text-xs font-medium text-muted-foreground">
+															Médio
+														</label>
+														<div className="flex items-center gap-1">
+															<Input
+																type="number"
+																step="0.1"
+																className="text-sm"
+																value={ing.quantityMedium}
+																onChange={(e) =>
+																	updateIngredient(
+																		idx,
+																		"quantityMedium",
+																		e.target.value,
+																	)
+																}
+															/>
+															<span className="text-xs text-muted-foreground min-w-8">
+																{getProductUnit(ing.productId)}
+															</span>
+														</div>
+													</div>
+													<div className="space-y-1">
+														<label className="text-xs font-medium text-muted-foreground">
+															Grande
+														</label>
+														<div className="flex items-center gap-1">
+															<Input
+																type="number"
+																step="0.1"
+																className="text-sm"
+																value={ing.quantityLarge}
+																onChange={(e) =>
+																	updateIngredient(
+																		idx,
+																		"quantityLarge",
+																		e.target.value,
+																	)
+																}
+															/>
+															<span className="text-xs text-muted-foreground min-w-8">
+																{getProductUnit(ing.productId)}
+															</span>
+														</div>
+													</div>
+												</div>
 											</div>
 										))}
 									</div>
@@ -281,14 +359,24 @@ export default function DishesPage() {
 									<p className="text-xs font-medium text-muted-foreground mb-2 uppercase">
 										Ingredientes
 									</p>
-									<div className="flex flex-wrap gap-1.5">
+									<div className="space-y-2">
 										{d.ingredients.map((ing, i) => (
-											<span
-												key={i}
-												className="text-xs bg-secondary px-2 py-1 rounded-full whitespace-nowrap">
-												{getProductName(ing.productId)}: {ing.quantity}{" "}
-												{getProductUnit(ing.productId)}
-											</span>
+											<div key={i} className="text-xs bg-secondary/50 p-2 rounded">
+												<div className="font-semibold mb-1">
+													{getProductName(ing.productId)}
+												</div>
+												<div className="flex gap-2 text-muted-foreground">
+													<span>
+														P: {ing.quantitySmall} {getProductUnit(ing.productId)}
+													</span>
+													<span>
+														M: {ing.quantityMedium} {getProductUnit(ing.productId)}
+													</span>
+													<span>
+														G: {ing.quantityLarge} {getProductUnit(ing.productId)}
+													</span>
+												</div>
+											</div>
 										))}
 									</div>
 								</div>

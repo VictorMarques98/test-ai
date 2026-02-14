@@ -17,6 +17,15 @@ export default function ClientsPage() {
 	const [form, setForm] = useState({ name: "", phone: "", email: "", description: "" });
 	const [search, setSearch] = useState("");
 
+	// Handle opening modal from navigation
+	useEffect(() => {
+		const state = location.state as { openModal?: boolean } | null;
+		if (state?.openModal) {
+			setOpen(true);
+			window.history.replaceState({}, document.title);
+		}
+	}, [location.state]);
+
 	// Handle incoming filter from navigation
 	useEffect(() => {
 		const state = location.state as { filterClientId?: string } | null;

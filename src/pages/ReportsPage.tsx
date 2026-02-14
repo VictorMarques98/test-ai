@@ -142,8 +142,14 @@ export default function ReportsPage() {
 					dish.ingredients.forEach((ingredient) => {
 						const product = products.find((p) => p.id === ingredient.productId);
 						if (product && product.buyPrice) {
+							const ingredientQty =
+								item.size === "small"
+									? ingredient.quantitySmall
+									: item.size === "medium"
+										? ingredient.quantityMedium
+										: ingredient.quantityLarge;
 							// Cost = buy price × ingredient quantity × order quantity
-							totalCost += product.buyPrice * ingredient.quantity * item.quantity;
+							totalCost += product.buyPrice * ingredientQty * item.quantity;
 						}
 					});
 				});

@@ -76,11 +76,17 @@ export const useRestaurantStore = create<RestaurantStore>()(
 					const dish = state.dishes.find((d) => d.id === item.dishId);
 					if (!dish) continue;
 					for (const ing of dish.ingredients) {
+						const ingredientQty =
+							item.size === "small"
+								? ing.quantitySmall
+								: item.size === "medium"
+									? ing.quantityMedium
+									: ing.quantityLarge;
 						const pIdx = updatedProducts.findIndex((p) => p.id === ing.productId);
 						if (pIdx !== -1) {
 							updatedProducts[pIdx] = {
 								...updatedProducts[pIdx],
-								quantity: Math.max(0, updatedProducts[pIdx].quantity - ing.quantity * item.quantity),
+								quantity: Math.max(0, updatedProducts[pIdx].quantity - ingredientQty * item.quantity),
 							};
 						}
 					}
@@ -108,7 +114,7 @@ export const useRestaurantStore = create<RestaurantStore>()(
 );
 
 export function checkOrderFeasibility(
-	items: { dishId: string; quantity: number }[],
+	items: { dishId: string; quantity: number; size: "small" | "medium" | "large" }[],
 	dishes: Dish[],
 	products: Product[],
 ) {
@@ -117,7 +123,13 @@ export function checkOrderFeasibility(
 		const dish = dishes.find((d) => d.id === item.dishId);
 		if (!dish) continue;
 		for (const ing of dish.ingredients) {
-			needed[ing.productId] = (needed[ing.productId] || 0) + ing.quantity * item.quantity;
+			const ingredientQty =
+				item.size === "small"
+					? ing.quantitySmall
+					: item.size === "medium"
+						? ing.quantityMedium
+						: ing.quantityLarge;
+			needed[ing.productId] = (needed[ing.productId] || 0) + ingredientQty * item.quantity;
 		}
 	}
 	const shortages: { product: Product; needed: number; available: number }[] = [];
