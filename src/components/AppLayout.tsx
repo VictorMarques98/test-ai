@@ -13,7 +13,7 @@ export default function AppLayout() {
   return (
     <div className="flex min-h-screen">
       <aside className="w-64 bg-card border-r border-border p-6 hidden md:flex flex-col">
-        <h2 className="font-display text-xl font-bold text-primary mb-8 tracking-wide">🍽️ RestaurantOS</h2>
+        <h2 className="text-xl font-bold text-primary mb-8 tracking-wide">🍽️ Thaina Pty</h2>
         <nav className="space-y-1 flex-1">
           {links.map((l) => (
             <NavLink
