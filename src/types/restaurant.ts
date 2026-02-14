@@ -11,6 +11,7 @@ export interface Client {
 	name: string;
 	phone: string;
 	email: string;
+	description?: string;
 }
 
 export interface DishIngredient {
@@ -21,13 +22,16 @@ export interface DishIngredient {
 export interface Dish {
 	id: string;
 	name: string;
-	price: number;
+	priceSmall: number;
+	priceMedium: number;
+	priceLarge: number;
 	ingredients: DishIngredient[];
 }
 
 export interface OrderItem {
 	dishId: string;
 	quantity: number;
+	size: "small" | "medium" | "large";
 }
 
 export interface Order {

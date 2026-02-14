@@ -8,19 +8,12 @@ import { Package, UtensilsCrossed, ClipboardList, AlertTriangle, ArrowRight } fr
 export default function DashboardPage() {
 	const navigate = useNavigate();
 	const { products, dishes, orders } = useRestaurantStore();
-	const lowStock = products.filter((p) => p.quantity <= p.minStock);
 	const pendingOrders = orders.filter((o) => o.status === "pending");
 
 	const stats = [
 		{ label: "Estoque", value: products.length, icon: Package, color: "text-primary" },
 		{ label: "Cardapio", value: dishes.length, icon: UtensilsCrossed, color: "text-primary" },
 		{ label: "Pedidos", value: orders.length, icon: ClipboardList, color: "text-primary" },
-		{
-			label: "Estoque Baixo",
-			value: lowStock.length,
-			icon: AlertTriangle,
-			color: lowStock.length > 0 ? "text-destructive" : "text-primary",
-		},
 	];
 
 	return (
@@ -45,38 +38,6 @@ export default function DashboardPage() {
 					</Card>
 				))}
 			</div>
-
-			{lowStock.length > 0 && (
-				<Card className="border-destructive/50 bg-destructive">
-					<CardHeader>
-						<CardTitle className="text-destructive flex items-center gap-2 text-white">
-							<AlertTriangle className="w-7 h-7 text-white" /> Alertas de Estoque Baixo
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-2">
-							{lowStock.map((p, index) => (
-								<>
-									{index > 0 && lowStock.length > 1 && <div className="h-px bg-white/50" />}
-									<div
-										key={p.id}
-										className="flex items-center justify-between py-2 border-white text-white">
-										<span className="font-medium text-lg">{p.name}</span>
-										<div className="flex items-center gap-2">
-											<span className="font-bold bg-card px-2 py-1 text-destructive rounded-sm">
-												Qtd atual: {p.quantity} {p.unit}
-											</span>
-											<span className="font-bold bg-card px-2 py-1 text-destructive rounded-sm">
-												Estoque minimo: {p.minStock} {p.unit}
-											</span>
-										</div>
-									</div>
-								</>
-							))}
-						</div>
-					</CardContent>
-				</Card>
-			)}
 
 			{pendingOrders.length > 0 && (
 				<Card>

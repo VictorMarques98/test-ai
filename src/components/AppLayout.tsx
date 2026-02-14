@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { LayoutDashboard, Package, UtensilsCrossed, ClipboardList, Users } from "lucide-react";
+import LowStockBanner from "./LowStockBanner";
 
 const links = [
 	{ to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -53,6 +54,7 @@ export default function AppLayout() {
 			</div>
 
 			<main className="flex-1 p-6 md:p-8 pb-24 md:pb-8 overflow-auto">
+				<LowStockBanner />
 				<Outlet />
 			</main>
 		</div>

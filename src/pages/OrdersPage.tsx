@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useRestaurantStore, checkOrderFeasibility } from "@/store/restaurantStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,10 +24,11 @@ import { Badge } from "@/components/ui/badge";
 
 export default function OrdersPage() {
 	const location = useLocation();
+	const navigate = useNavigate();
 	const { orders, dishes, products, clients, addOrder, updateOrder, confirmOrder, deleteOrder } =
 		useRestaurantStore();
 	const [open, setOpen] = useState(false);
-	const [items, setItems] = useState<{ dishId: string; quantity: number }[]>([]);
+	const [items, setItems] = useState<{ dishId: string; quantity: number; size: "small" | "medium" | "large" }[]>([]);
 	const [selectedClientId, setSelectedClientId] = useState<string>("");
 	const [description, setDescription] = useState<string>("");
 	const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export default function OrdersPage() {
 
 	const addItem = () => {
 		if (dishes.length === 0) return;
-		setItems([...items, { dishId: dishes[0].id, quantity: 1 }]);
+		setItems([...items, { dishId: dishes[0].id, quantity: 1, size: "medium" }]);
 	};
 
 	const updateItem = (idx: number, field: string, value: string | number) => {
@@ -93,6 +94,22 @@ export default function OrdersPage() {
 
 	const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || "Unknown";
 	const getClientName = (id?: string) => (id ? clients.find((c) => c.id === id)?.name || "Unknown" : "—");
+
+	const calculateOrderTotal = (orderItems: typeof items) => {
+		return orderItems.reduce((total, item) => {
+			const dish = dishes.find((d) => d.id === item.dishId);
+			if (!dish) return total;
+			const price =
+				item.size === "small" ? dish.priceSmall : item.size === "medium" ? dish.priceMedium : dish.priceLarge;
+			return total + price * item.quantity;
+		}, 0);
+	};
+
+	const handleClientClick = (clientId?: string) => {
+		if (clientId) {
+			navigate("/clients", { state: { filterClientId: clientId } });
+		}
+	};
 
 	const statusColor = (s: string) => {
 		if (s === "pending") return "outline";
@@ -148,130 +165,163 @@ export default function OrdersPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div>
-					<h1 className="text-3xl font-bold">Pedidos</h1>
-					<p className="text-muted-foreground mt-1">
-						Acompanhe os pedidos dos clientes e o impacto no estoque
-					</p>
-				</div>
-				<Dialog
-					open={open}
-					onOpenChange={(v) => {
-						setOpen(v);
-						if (!v) {
-							setItems([]);
-							setSelectedClientId("");
-							setDescription("");
-							setEditingOrderId(null);
-						}
-					}}>
-					<DialogTrigger asChild>
-						<Button disabled={dishes.length === 0}>
-							<Plus className="w-4 h-4 mr-2" />
-							{dishes.length === 0 ? "Adicione os pratos primeiros" : "Novo pedido"}
-						</Button>
-					</DialogTrigger>
-					<DialogContent className="max-w-lg">
-						<DialogHeader>
-							<DialogTitle>{editingOrderId ? "Editar Pedido" : "Novo pedido"}</DialogTitle>
-						</DialogHeader>
-						<div className="space-y-4 mt-2">
-							{clients.length > 0 && (
-								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Cliente</label>
-									<Select value={selectedClientId} onValueChange={setSelectedClientId}>
-										<SelectTrigger>
-											<SelectValue placeholder="Select a client (optional)" />
-										</SelectTrigger>
-										<SelectContent>
-											{clients.map((c) => (
-												<SelectItem key={c.id} value={c.id}>
-													{c.name}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-							)}
-							<div className="space-y-1.5">
-								<label className="text-sm font-medium">Descrição (opcional)</label>
-								<textarea
-									className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-									placeholder="Adicione observações ou instruções especiais..."
-									value={description}
-									onChange={(e) => setDescription(e.target.value)}
-								/>
-							</div>
-							<div className="flex items-center justify-between">
-								<p className="text-sm font-medium">Items</p>
-								<Button variant="outline" size="sm" onClick={addItem}>
-									<Plus className="w-3 h-3 mr-1" />
-									Adicionar prato
-								</Button>
-							</div>
-							<div className="space-y-2">
-								{items.map((item, idx) => (
-									<div key={idx} className="flex items-center gap-2">
-										<Select value={item.dishId} onValueChange={(v) => updateItem(idx, "dishId", v)}>
-											<SelectTrigger className="flex-1">
-												<SelectValue />
+			{/* Header Section */}
+			<div className="bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-900 dark:to-black rounded-lg p-6 shadow-lg">
+				<div className="flex items-center justify-between">
+					<div className="flex items-center gap-4">
+						<div className="p-3 bg-primary/20 rounded-lg">
+							<ShoppingCart className="w-8 h-8 text-primary" />
+						</div>
+						<div>
+							<h1 className="text-3xl font-bold text-white">Pedidos</h1>
+							<p className="text-slate-300 mt-1">
+								Acompanhe os pedidos dos clientes e o impacto no estoque
+							</p>
+						</div>
+					</div>
+					<Dialog
+						open={open}
+						onOpenChange={(v) => {
+							setOpen(v);
+							if (!v) {
+								setItems([]);
+								setSelectedClientId("");
+								setDescription("");
+								setEditingOrderId(null);
+							}
+						}}>
+						<DialogTrigger asChild>
+							<Button size="lg" className="shadow-lg" disabled={dishes.length === 0}>
+								<Plus className="w-4 h-4 mr-2" />
+								{dishes.length === 0 ? "Adicione os pratos primeiros" : "Novo pedido"}
+							</Button>
+						</DialogTrigger>
+						<DialogContent className="max-w-lg">
+							<DialogHeader>
+								<DialogTitle>{editingOrderId ? "Editar Pedido" : "Novo pedido"}</DialogTitle>
+							</DialogHeader>
+							<div className="space-y-4 mt-2">
+								{clients.length > 0 && (
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Cliente</label>
+										<Select value={selectedClientId} onValueChange={setSelectedClientId}>
+											<SelectTrigger>
+												<SelectValue placeholder="Select a client (optional)" />
 											</SelectTrigger>
 											<SelectContent>
-												{dishes.map((d) => (
-													<SelectItem key={d.id} value={d.id}>
-														{d.name}
+												{clients.map((c) => (
+													<SelectItem key={c.id} value={c.id}>
+														{c.name}
 													</SelectItem>
 												))}
 											</SelectContent>
 										</Select>
-										<Input
-											type="number"
-											className="w-20"
-											min={1}
-											value={item.quantity}
-											onChange={(e) => updateItem(idx, "quantity", e.target.value)}
-										/>
-										<Button variant="ghost" size="icon" onClick={() => removeItem(idx)}>
-											<X className="w-3 h-3" />
-										</Button>
-									</div>
-								))}
-								{items.length === 0 && (
-									<div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center gap-2">
-										<AlertTriangle className="w-4 h-4 text-amber-600" />
-										<p className="text-sm text-amber-800">Adicione pelo menos um prato ao pedido</p>
 									</div>
 								)}
-							</div>
-
-							{feasibility && feasibility.shortages.length > 0 && (
-								<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
-									<div className="flex items-center gap-2 text-destructive font-semibold text-sm">
-										<AlertTriangle className="w-4 h-4" /> Inventory Shortage
-									</div>
-									{feasibility.shortages.map((s, i) => (
-										<p key={i} className="text-xs text-destructive/80">
-											{s.product.name}: need {s.needed} {s.product.unit}, only {s.available}{" "}
-											available
-										</p>
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Descrição (opcional)</label>
+									<textarea
+										className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+										placeholder="Adicione observações ou instruções especiais..."
+										value={description}
+										onChange={(e) => setDescription(e.target.value)}
+									/>
+								</div>
+								<div className="flex items-center justify-between">
+									<p className="text-sm font-medium">Items</p>
+									<Button variant="outline" size="sm" onClick={addItem}>
+										<Plus className="w-3 h-3 mr-1" />
+										Adicionar prato
+									</Button>
+								</div>
+								<div className="space-y-2">
+									{items.map((item, idx) => (
+										<div key={idx} className="flex items-center gap-2">
+											<Select
+												value={item.dishId}
+												onValueChange={(v) => updateItem(idx, "dishId", v)}>
+												<SelectTrigger className="flex-1">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent>
+													{dishes.map((d) => (
+														<SelectItem key={d.id} value={d.id}>
+															{d.name}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+											<Select value={item.size} onValueChange={(v) => updateItem(idx, "size", v)}>
+												<SelectTrigger className="w-24">
+													<SelectValue />
+												</SelectTrigger>
+												<SelectContent>
+													<SelectItem value="small">P</SelectItem>
+													<SelectItem value="medium">M</SelectItem>
+													<SelectItem value="large">G</SelectItem>
+												</SelectContent>
+											</Select>
+											<Input
+												type="number"
+												className="w-20"
+												min={1}
+												value={item.quantity}
+												onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+											/>
+											<Button variant="ghost" size="icon" onClick={() => removeItem(idx)}>
+												<X className="w-3 h-3" />
+											</Button>
+										</div>
 									))}
+									{items.length === 0 && (
+										<div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center gap-2">
+											<AlertTriangle className="w-4 h-4 text-amber-600" />
+											<p className="text-sm text-amber-800">
+												Adicione pelo menos um prato ao pedido
+											</p>
+										</div>
+									)}
 								</div>
-							)}
 
-							{feasibility && feasibility.shortages.length === 0 && items.length > 0 && (
-								<div className="bg-success/10 border border-success/30 rounded-lg p-3 flex items-center gap-2 text-sm">
-									<CheckCircle2 className="w-4 h-4 text-success" />
-									<span className="text-success">Todos ingredientes diponiveis</span>
-								</div>
-							)}
+								{feasibility && feasibility.shortages.length > 0 && (
+									<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
+										<div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+											<AlertTriangle className="w-4 h-4" /> Inventory Shortage
+										</div>
+										{feasibility.shortages.map((s, i) => (
+											<p key={i} className="text-xs text-destructive/80">
+												{s.product.name}: need {s.needed} {s.product.unit}, only {s.available}{" "}
+												available
+											</p>
+										))}
+									</div>
+								)}
 
-							<Button className="w-full" onClick={handleSubmit} disabled={items.length === 0}>
-								{editingOrderId ? "Atualizar Pedido" : "Place Order"}
-							</Button>
-						</div>
-					</DialogContent>
-				</Dialog>
+								{feasibility && feasibility.shortages.length === 0 && items.length > 0 && (
+									<div className="bg-success/10 border border-success/30 rounded-lg p-3 flex items-center gap-2 text-sm">
+										<CheckCircle2 className="w-4 h-4 text-success" />
+										<span className="text-success">Todos ingredientes diponiveis</span>
+									</div>
+								)}
+
+								{items.length > 0 && (
+									<div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
+										<span className="font-semibold text-slate-700 dark:text-slate-300">
+											Total do Pedido:
+										</span>
+										<span className="text-2xl font-bold text-primary">
+											${calculateOrderTotal(items).toFixed(2)}
+										</span>
+									</div>
+								)}
+
+								<Button className="w-full" onClick={handleSubmit} disabled={items.length === 0}>
+									{editingOrderId ? "Atualizar Pedido" : "Place Order"}
+								</Button>
+							</div>
+						</DialogContent>
+					</Dialog>
+				</div>
 			</div>
 
 			{/* Filters Section */}
@@ -381,19 +431,22 @@ export default function OrdersPage() {
 					</CardContent>
 				</Card>
 			) : (
-				<div className="grid gap-4">
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					{sortedOrders.map((o) => (
-						<Card key={o.id} className="overflow-hidden">
-							<CardContent className="p-0">
+						<Card key={o.id} className="overflow-hidden flex flex-col">
+							<CardContent className="p-0 flex flex-col h-full">
 								{/* Header Section */}
 								<div className="flex items-center justify-between p-5 bg-gradient-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900 border-b-2 border-slate-300 dark:border-slate-700">
 									<div className="flex flex-col gap-1">
 										<span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-widest">
 											Pedido #{o.id.slice(0, 8)}
 										</span>
-										<span className="text-base font-bold text-slate-900 dark:text-slate-100">
+										<button
+											onClick={() => handleClientClick(o.clientId)}
+											disabled={!o.clientId}
+											className={`text-base font-bold text-left ${o.clientId ? "text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors underline decoration-transparent hover:decoration-current" : "text-slate-900 dark:text-slate-100 cursor-default"}`}>
 											{getClientName(o.clientId)}
-										</span>
+										</button>
 									</div>
 									<div className="flex items-center gap-4">
 										<span className="text-sm font-semibold text-slate-800 dark:text-slate-300">
@@ -428,26 +481,51 @@ export default function OrdersPage() {
 								)}
 
 								{/* Items Section */}
-								<div className="p-4 w-80">
+								<div className="p-4 flex-1">
 									<p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
 										Itens ({o.items.length})
 									</p>
 									<div className="space-y-2">
 										{o.items.map((item, i) => {
 											const dish = dishes.find((d) => d.id === item.dishId);
+											const price = dish
+												? item.size === "small"
+													? dish.priceSmall
+													: item.size === "medium"
+														? dish.priceMedium
+														: dish.priceLarge
+												: 0;
 											return (
 												<div
 													key={i}
 													className="flex items-center justify-between py-2 px-3 bg-secondary/50 rounded-md">
-													<span className="text-sm font-medium">
-														{getDishName(item.dishId)}
-													</span>
+													<div className="flex flex-col">
+														<span className="text-sm font-medium">
+															{getDishName(item.dishId)}
+														</span>
+														<span className="text-xs text-muted-foreground">
+															{item.size === "small"
+																? "Pequeno"
+																: item.size === "medium"
+																	? "Médio"
+																	: "Grande"}{" "}
+															- ${price.toFixed(2)}
+														</span>
+													</div>
 													<span className="text-sm text-muted-foreground">
 														× {item.quantity}
 													</span>
 												</div>
 											);
 										})}
+									</div>
+									<div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+										<span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+											Total:
+										</span>
+										<span className="text-lg font-bold text-primary">
+											${calculateOrderTotal(o.items).toFixed(2)}
+										</span>
 									</div>
 								</div>
 
