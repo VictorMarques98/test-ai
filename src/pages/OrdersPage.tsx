@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 
 export default function OrdersPage() {
-  const { orders, dishes, products, addOrder, confirmOrder } = useRestaurantStore();
+  const { orders, dishes, products, clients, addOrder, confirmOrder } = useRestaurantStore();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<{ dishId: string; quantity: number }[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
 
   const addItem = () => {
     if (dishes.length === 0) return;
@@ -33,12 +34,14 @@ export default function OrdersPage() {
 
   const handleSubmit = () => {
     if (items.length === 0) return;
-    addOrder(items);
+    addOrder(items, selectedClientId || undefined);
     setItems([]);
+    setSelectedClientId('');
     setOpen(false);
   };
 
   const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || 'Unknown';
+  const getClientName = (id?: string) => (id ? clients.find((c) => c.id === id)?.name || 'Unknown' : '—');
 
   const statusColor = (s: string) => {
     if (s === 'pending') return 'secondary';
@@ -55,7 +58,7 @@ export default function OrdersPage() {
           <h1 className="text-3xl font-bold">Orders</h1>
           <p className="text-muted-foreground mt-1">Track customer orders & stock impact</p>
         </div>
-        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setItems([]); }}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setItems([]); setSelectedClientId(''); } }}>
           <DialogTrigger asChild>
             <Button disabled={dishes.length === 0}>
               <Plus className="w-4 h-4 mr-2" />{dishes.length === 0 ? 'Add dishes first' : 'New Order'}
@@ -64,6 +67,14 @@ export default function OrdersPage() {
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>New Order</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-2">
+              {clients.length > 0 && (
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger><SelectValue placeholder="Select a client (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">Items</p>
                 <Button variant="outline" size="sm" onClick={addItem}><Plus className="w-3 h-3 mr-1" />Add Dish</Button>
@@ -124,6 +135,7 @@ export default function OrdersPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-muted-foreground font-mono">#{o.id.slice(0, 6)}</span>
+                    <span className="text-sm font-medium">{getClientName(o.clientId)}</span>
                     <Badge variant={statusColor(o.status)}>{o.status}</Badge>
                   </div>
                   <div className="flex items-center gap-2">
