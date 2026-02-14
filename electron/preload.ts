@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld("database", {
 	clear: () => ipcRenderer.invoke("db:clear"),
 });
 
+console.log("[Preload] database API exposed");
+
 // Expose only safe APIs to the renderer process
 contextBridge.exposeInMainWorld("api", {
 	platform: process.platform,

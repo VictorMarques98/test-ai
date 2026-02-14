@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, ipcMain } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 import {
 	initDatabase,
 	closeDatabase,
@@ -24,7 +25,7 @@ const createWindow = () => {
 		minWidth: 800,
 		minHeight: 600,
 		webPreferences: {
-			preload: path.join(__dirname, "preload.js"),
+			preload: path.join(__dirname, "preload.cjs"),
 			nodeIntegration: false,
 			contextIsolation: true,
 			sandbox: true,
