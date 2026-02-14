@@ -42,10 +42,21 @@ export const useRestaurantStore = create<RestaurantStore>()(
 			deleteDish: (id) => set((s) => ({ dishes: s.dishes.filter((x) => x.id !== id) })),
 			addOrder: (items, clientId, description) => {
 				const id = genId();
+				const state = get();
+				const orderNumber =
+					state.orders.length > 0 ? Math.max(...state.orders.map((o) => o.orderNumber)) + 1 : 1;
 				set((s) => ({
 					orders: [
 						...s.orders,
-						{ id, items, clientId, description, createdAt: new Date().toISOString(), status: "pending" },
+						{
+							id,
+							orderNumber,
+							items,
+							clientId,
+							description,
+							createdAt: new Date().toISOString(),
+							status: "pending",
+						},
 					],
 				}));
 				return id;

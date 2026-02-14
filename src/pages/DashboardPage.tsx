@@ -19,8 +19,8 @@ export default function DashboardPage() {
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-3xl font-bold">Painel</h1>
-				<p className="text-muted-foreground mt-1">Visão geral do restaurante</p>
+				<h1 className="text-3xl font-bold">Bem vindo!</h1>
+				<p className="text-muted-foreground mt-1">Visão geral</p>
 			</div>
 
 			<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -39,15 +39,14 @@ export default function DashboardPage() {
 				))}
 			</div>
 
-			{pendingOrders.length > 0 && (
-				<Card>
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<ClipboardList className="w-7 h-7 text-primary" /> Pedidos em andamento (
-							{pendingOrders.length})
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
+			<Card>
+				<CardHeader>
+					<CardTitle className="flex items-center gap-2">
+						<ClipboardList className="w-7 h-7 text-primary" /> Pedidos em andamento ({pendingOrders.length})
+					</CardTitle>
+				</CardHeader>
+				<CardContent>
+					{pendingOrders.length > 0 ? (
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -59,7 +58,7 @@ export default function DashboardPage() {
 							<TableBody>
 								{pendingOrders.map((o) => (
 									<TableRow key={o.id}>
-										<TableCell className="font-mono">#{o.id.slice(0, 6)}</TableCell>
+										<TableCell className="font-mono">#{o.orderNumber}</TableCell>
 										<TableCell className="text-muted-foreground">
 											{new Date(o.createdAt).toLocaleDateString()}
 										</TableCell>
@@ -67,7 +66,11 @@ export default function DashboardPage() {
 											<Button
 												variant="ghost"
 												size="sm"
-												onClick={() => navigate("/orders", { state: { filterOrderId: o.id } })}
+												onClick={() =>
+													navigate("/orders", {
+														state: { filterOrderNumber: o.orderNumber.toString() },
+													})
+												}
 												className="gap-1">
 												Ver detalhes
 												<ArrowRight className="w-4 h-4" />
@@ -77,9 +80,14 @@ export default function DashboardPage() {
 								))}
 							</TableBody>
 						</Table>
-					</CardContent>
-				</Card>
-			)}
+					) : (
+						<div className="flex flex-col items-center justify-center py-8 text-center">
+							<ClipboardList className="w-12 h-12 text-muted-foreground/50 mb-3" />
+							<p className="text-muted-foreground">Nenhum pedido em andamento</p>
+						</div>
+					)}
+				</CardContent>
+			</Card>
 		</div>
 	);
 }

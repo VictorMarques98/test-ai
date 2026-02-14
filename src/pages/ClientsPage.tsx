@@ -282,7 +282,7 @@ export default function ClientsPage() {
 																key={o.id}
 																className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
 																<TableCell className="font-mono text-xs font-semibold">
-																	#{o.id.slice(0, 8)}
+																	#{o.orderNumber}
 																</TableCell>
 																<TableCell>
 																	<div className="flex flex-wrap gap-1">

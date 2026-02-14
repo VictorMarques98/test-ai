@@ -37,15 +37,15 @@ export default function OrdersPage() {
 	const [filtersExpanded, setFiltersExpanded] = useState(true);
 	const [filterStatus, setFilterStatus] = useState<string>("all");
 	const [filterClient, setFilterClient] = useState<string>("all");
-	const [filterOrderId, setFilterOrderId] = useState<string>("");
+	const [filterOrderNumber, setFilterOrderNumber] = useState<string>("");
 	const [filterDateFrom, setFilterDateFrom] = useState<string>("");
 	const [filterDateTo, setFilterDateTo] = useState<string>("");
 
 	// Handle incoming filter from navigation
 	useEffect(() => {
-		const state = location.state as { filterOrderId?: string } | null;
-		if (state?.filterOrderId) {
-			setFilterOrderId(state.filterOrderId);
+		const state = location.state as { filterOrderNumber?: string } | null;
+		if (state?.filterOrderNumber) {
+			setFilterOrderNumber(state.filterOrderNumber);
 			setFiltersExpanded(true);
 			// Clear the state to avoid re-applying on refresh
 			window.history.replaceState({}, document.title);
@@ -126,8 +126,8 @@ export default function OrdersPage() {
 			// Client filter
 			if (filterClient !== "all" && order.clientId !== filterClient) return false;
 
-			// Order ID filter
-			if (filterOrderId && !order.id.toLowerCase().includes(filterOrderId.toLowerCase())) return false;
+			// Order Number filter
+			if (filterOrderNumber && !order.orderNumber.toString().includes(filterOrderNumber)) return false;
 
 			// Date range filter
 			const orderDate = new Date(order.createdAt);
@@ -144,21 +144,21 @@ export default function OrdersPage() {
 
 			return true;
 		});
-	}, [orders, filterStatus, filterClient, filterOrderId, filterDateFrom, filterDateTo]);
+	}, [orders, filterStatus, filterClient, filterOrderNumber, filterDateFrom, filterDateTo]);
 
 	const sortedOrders = [...filteredOrders].reverse();
 
 	const hasActiveFilters =
 		filterStatus !== "all" ||
 		filterClient !== "all" ||
-		filterOrderId !== "" ||
+		filterOrderNumber !== "" ||
 		filterDateFrom !== "" ||
 		filterDateTo !== "";
 
 	const clearFilters = () => {
 		setFilterStatus("all");
 		setFilterClient("all");
-		setFilterOrderId("");
+		setFilterOrderNumber("");
 		setFilterDateFrom("");
 		setFilterDateTo("");
 	};
@@ -379,13 +379,13 @@ export default function OrdersPage() {
 								</Select>
 							</div>
 
-							{/* Order ID Filter */}
+							{/* Order Number Filter */}
 							<div className="space-y-1.5">
-								<label className="text-xs font-medium text-muted-foreground">ID do Pedido</label>
+								<label className="text-xs font-medium text-muted-foreground">Número do Pedido</label>
 								<Input
-									placeholder="Buscar por ID..."
-									value={filterOrderId}
-									onChange={(e) => setFilterOrderId(e.target.value)}
+									placeholder="Buscar por número..."
+									value={filterOrderNumber}
+									onChange={(e) => setFilterOrderNumber(e.target.value)}
 									className="h-9"
 								/>
 							</div>
@@ -439,7 +439,7 @@ export default function OrdersPage() {
 								<div className="flex items-center justify-between p-5 bg-gradient-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900 border-b-2 border-slate-300 dark:border-slate-700">
 									<div className="flex flex-col gap-1">
 										<span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-widest">
-											Pedido #{o.id.slice(0, 8)}
+											Pedido #{o.orderNumber}
 										</span>
 										<button
 											onClick={() => handleClientClick(o.clientId)}
