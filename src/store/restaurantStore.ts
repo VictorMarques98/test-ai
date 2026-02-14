@@ -14,9 +14,11 @@ interface RestaurantStore {
 	addDish: (d: Omit<Dish, "id">) => void;
 	updateDish: (id: string, d: Partial<Dish>) => void;
 	deleteDish: (id: string) => void;
-	addOrder: (items: Order["items"], clientId?: string) => string;
+	addOrder: (items: Order["items"], clientId?: string, description?: string) => string;
+	updateOrder: (id: string, items: Order["items"], clientId?: string, description?: string) => void;
 	updateOrderStatus: (id: string, status: Order["status"]) => void;
 	confirmOrder: (id: string) => void;
+	deleteOrder: (id: string) => void;
 	addClient: (c: Omit<Client, "id">) => void;
 	updateClient: (id: string, c: Partial<Client>) => void;
 	deleteClient: (id: string) => void;
@@ -38,16 +40,20 @@ export const useRestaurantStore = create<RestaurantStore>()(
 			addDish: (d) => set((s) => ({ dishes: [...s.dishes, { ...d, id: genId() }] })),
 			updateDish: (id, d) => set((s) => ({ dishes: s.dishes.map((x) => (x.id === id ? { ...x, ...d } : x)) })),
 			deleteDish: (id) => set((s) => ({ dishes: s.dishes.filter((x) => x.id !== id) })),
-			addOrder: (items, clientId) => {
+			addOrder: (items, clientId, description) => {
 				const id = genId();
 				set((s) => ({
 					orders: [
 						...s.orders,
-						{ id, items, clientId, createdAt: new Date().toISOString(), status: "pending" },
+						{ id, items, clientId, description, createdAt: new Date().toISOString(), status: "pending" },
 					],
 				}));
 				return id;
 			},
+			updateOrder: (id, items, clientId, description) =>
+				set((s) => ({
+					orders: s.orders.map((o) => (o.id === id ? { ...o, items, clientId, description } : o)),
+				})),
 			updateOrderStatus: (id, status) =>
 				set((s) => ({ orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)) })),
 			confirmOrder: (id) => {
@@ -73,6 +79,7 @@ export const useRestaurantStore = create<RestaurantStore>()(
 					orders: state.orders.map((o) => (o.id === id ? { ...o, status: "confirmed" } : o)),
 				});
 			},
+			deleteOrder: (id) => set((s) => ({ orders: s.orders.filter((o) => o.id !== id) })),
 			addClient: (c) => set((s) => ({ clients: [...s.clients, { ...c, id: genId() }] })),
 			updateClient: (id, c) =>
 				set((s) => ({ clients: s.clients.map((x) => (x.id === id ? { ...x, ...c } : x)) })),
