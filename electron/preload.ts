@@ -32,6 +32,15 @@ contextBridge.exposeInMainWorld("electron", {
 	version: process.env.npm_package_version || "1.0.0",
 });
 
+// Expose database APIs to the renderer process
+contextBridge.exposeInMainWorld("database", {
+	set: (key: string, value: string) => ipcRenderer.invoke("db:set", key, value),
+	get: (key: string) => ipcRenderer.invoke("db:get", key),
+	getAll: () => ipcRenderer.invoke("db:getAll"),
+	delete: (key: string) => ipcRenderer.invoke("db:delete", key),
+	clear: () => ipcRenderer.invoke("db:clear"),
+});
+
 // Expose only safe APIs to the renderer process
 contextBridge.exposeInMainWorld("api", {
 	platform: process.platform,

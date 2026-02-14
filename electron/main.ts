@@ -1,6 +1,15 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, shell, ipcMain } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+	initDatabase,
+	closeDatabase,
+	setStoreData,
+	getStoreData,
+	getAllStoreData,
+	deleteStoreData,
+	clearStore,
+} from "./database.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +63,33 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows
 app.whenReady().then(() => {
+	// Initialize database
+	initDatabase();
+
+	// Setup IPC handlers for database operations
+	ipcMain.handle("db:set", (_event, key: string, value: string) => {
+		setStoreData(key, value);
+		return true;
+	});
+
+	ipcMain.handle("db:get", (_event, key: string) => {
+		return getStoreData(key);
+	});
+
+	ipcMain.handle("db:getAll", () => {
+		return getAllStoreData();
+	});
+
+	ipcMain.handle("db:delete", (_event, key: string) => {
+		deleteStoreData(key);
+		return true;
+	});
+
+	ipcMain.handle("db:clear", () => {
+		clearStore();
+		return true;
+	});
+
 	createWindow();
 
 	app.on("activate", () => {
@@ -67,6 +103,7 @@ app.whenReady().then(() => {
 
 // Quit when all windows are closed, except on macOS
 app.on("window-all-closed", () => {
+	closeDatabase();
 	if (process.platform !== "darwin") {
 		app.quit();
 	}
