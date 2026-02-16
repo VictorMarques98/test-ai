@@ -14,10 +14,12 @@ interface RestaurantStore {
 	addDish: (d: Omit<Dish, "id">) => void;
 	updateDish: (id: string, d: Partial<Dish>) => void;
 	deleteDish: (id: string) => void;
-	addOrder: (items: Order["items"], clientId?: string) => string;
+	addOrder: (items: Order["items"], clientId?: string, description?: string) => string;
+	updateOrder: (id: string, items: Order["items"], clientId?: string, description?: string) => void;
 	updateOrderStatus: (id: string, status: Order["status"]) => void;
 	confirmOrder: (id: string) => void;
-	addClient: (c: Omit<Client, "id">) => void;
+	deleteOrder: (id: string) => void;
+	addClient: (c: Omit<Client, "id">) => string;
 	updateClient: (id: string, c: Partial<Client>) => void;
 	deleteClient: (id: string) => void;
 }
@@ -38,16 +40,31 @@ export const useRestaurantStore = create<RestaurantStore>()(
 			addDish: (d) => set((s) => ({ dishes: [...s.dishes, { ...d, id: genId() }] })),
 			updateDish: (id, d) => set((s) => ({ dishes: s.dishes.map((x) => (x.id === id ? { ...x, ...d } : x)) })),
 			deleteDish: (id) => set((s) => ({ dishes: s.dishes.filter((x) => x.id !== id) })),
-			addOrder: (items, clientId) => {
+			addOrder: (items, clientId, description) => {
 				const id = genId();
+				const state = get();
+				const orderNumber =
+					state.orders.length > 0 ? Math.max(...state.orders.map((o) => o.orderNumber)) + 1 : 1;
 				set((s) => ({
 					orders: [
 						...s.orders,
-						{ id, items, clientId, createdAt: new Date().toISOString(), status: "pending" },
+						{
+							id,
+							orderNumber,
+							items,
+							clientId,
+							description,
+							createdAt: new Date().toISOString(),
+							status: "pending",
+						},
 					],
 				}));
 				return id;
 			},
+			updateOrder: (id, items, clientId, description) =>
+				set((s) => ({
+					orders: s.orders.map((o) => (o.id === id ? { ...o, items, clientId, description } : o)),
+				})),
 			updateOrderStatus: (id, status) =>
 				set((s) => ({ orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)) })),
 			confirmOrder: (id) => {
@@ -59,11 +76,17 @@ export const useRestaurantStore = create<RestaurantStore>()(
 					const dish = state.dishes.find((d) => d.id === item.dishId);
 					if (!dish) continue;
 					for (const ing of dish.ingredients) {
+						const ingredientQty =
+							item.size === "small"
+								? ing.quantitySmall
+								: item.size === "medium"
+									? ing.quantityMedium
+									: ing.quantityLarge;
 						const pIdx = updatedProducts.findIndex((p) => p.id === ing.productId);
 						if (pIdx !== -1) {
 							updatedProducts[pIdx] = {
 								...updatedProducts[pIdx],
-								quantity: Math.max(0, updatedProducts[pIdx].quantity - ing.quantity * item.quantity),
+								quantity: Math.max(0, updatedProducts[pIdx].quantity - ingredientQty * item.quantity),
 							};
 						}
 					}
@@ -73,7 +96,12 @@ export const useRestaurantStore = create<RestaurantStore>()(
 					orders: state.orders.map((o) => (o.id === id ? { ...o, status: "confirmed" } : o)),
 				});
 			},
-			addClient: (c) => set((s) => ({ clients: [...s.clients, { ...c, id: genId() }] })),
+			deleteOrder: (id) => set((s) => ({ orders: s.orders.filter((o) => o.id !== id) })),
+			addClient: (c) => {
+				const newId = genId();
+				set((s) => ({ clients: [...s.clients, { ...c, id: newId }] }));
+				return newId;
+			},
 			updateClient: (id, c) =>
 				set((s) => ({ clients: s.clients.map((x) => (x.id === id ? { ...x, ...c } : x)) })),
 			deleteClient: (id) => set((s) => ({ clients: s.clients.filter((x) => x.id !== id) })),
@@ -86,7 +114,7 @@ export const useRestaurantStore = create<RestaurantStore>()(
 );
 
 export function checkOrderFeasibility(
-	items: { dishId: string; quantity: number }[],
+	items: { dishId: string; quantity: number; size: "small" | "medium" | "large" }[],
 	dishes: Dish[],
 	products: Product[],
 ) {
@@ -95,7 +123,13 @@ export function checkOrderFeasibility(
 		const dish = dishes.find((d) => d.id === item.dishId);
 		if (!dish) continue;
 		for (const ing of dish.ingredients) {
-			needed[ing.productId] = (needed[ing.productId] || 0) + ing.quantity * item.quantity;
+			const ingredientQty =
+				item.size === "small"
+					? ing.quantitySmall
+					: item.size === "medium"
+						? ing.quantityMedium
+						: ing.quantityLarge;
+			needed[ing.productId] = (needed[ing.productId] || 0) + ingredientQty * item.quantity;
 		}
 	}
 	const shortages: { product: Product; needed: number; available: number }[] = [];
