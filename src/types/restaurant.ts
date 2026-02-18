@@ -1,12 +1,26 @@
-export interface Product {
-	id: string;
-	name: string;
-	quantity: number;
-	unit: string;
-	minStock: number;
-	buyPrice?: number;
-}
+// Re-export API types for backward compatibility
+export type {
+	Item,
+	CreateItemDto,
+	UpdateItemDto,
+	UnitType,
+	Product,
+	CreateProductDto,
+	UpdateProductDto,
+	ProductItemDto,
+	ProductItem,
+	Stock,
+	CreateStockDto,
+	UpdateStockDto,
+	Order,
+	CreateOrderDto,
+	UpdateOrderStatusDto,
+	OrderItem,
+	OrderStatus,
+	ApiError,
+} from './api';
 
+// Legacy types for UI components (if still needed)
 export interface Client {
 	id: string;
 	name: string;
@@ -15,6 +29,7 @@ export interface Client {
 	description?: string;
 }
 
+// Dish types for menu management (if needed beyond products)
 export interface DishIngredient {
 	productId: string;
 	quantitySmall: number;
@@ -31,18 +46,21 @@ export interface Dish {
 	ingredients: DishIngredient[];
 }
 
-export interface OrderItem {
-	dishId: string;
-	quantity: number;
-	size: "small" | "medium" | "large";
+// UI-specific types
+export interface LowStockItem {
+	item: Item;
+	stock: Stock;
+	threshold: number;
 }
 
-export interface Order {
-	id: string;
-	orderNumber: number;
-	items: OrderItem[];
-	clientId?: string;
-	description?: string;
-	createdAt: string;
-	status: "pending" | "confirmed" | "completed";
+export interface StockWithItem extends Stock {
+	item?: Item;
+}
+
+export interface ProductWithItems extends Product {
+	product_items?: ProductItem[];
+}
+
+export interface OrderWithItems extends Order {
+	order_items?: OrderItem[];
 }
