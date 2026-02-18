@@ -1,13 +1,17 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { ApiError } from '@/types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// Use proxy in development, direct URL in production
+const API_BASE_URL = import.meta.env.DEV 
+  ? '/api' 
+  : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000');
 
 // Debug: Log the API base URL to verify it's correct
 console.log('🔧 API Configuration:', {
+  mode: import.meta.env.MODE,
+  isDev: import.meta.env.DEV,
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   API_BASE_URL,
-  allEnvVars: import.meta.env
 });
 
 // Create axios instance with default config

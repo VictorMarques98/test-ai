@@ -21,6 +21,7 @@ export default function InventoryPage() {
 		createItem, 
 		updateItem, 
 		deleteItem,
+		createStock,
 		clearError 
 	} = useRestaurantStore();
 	const [open, setOpen] = useState(false);
@@ -28,7 +29,9 @@ export default function InventoryPage() {
 	const [form, setForm] = useState({ 
 		name: "", 
 		description: "", 
-		unit_type: "" as "grams" | "unit" | ""
+		unit_type: "" as "grams" | "unit" | "",
+		quantity: "",
+		alert_quantity: ""
 	});
 
 	// Fetch items on mount
@@ -58,7 +61,13 @@ export default function InventoryPage() {
 	}, [error, clearError]);
 
 	const resetForm = () => {
-		setForm({ name: "", description: "", unit_type: "" as "" });
+		setForm({ 
+			name: "", 
+			description: "", 
+			unit_type: "" as "",
+			quantity: "",
+			alert_quantity: ""
+		});
 		setEditId(null);
 	};
 
@@ -68,19 +77,42 @@ export default function InventoryPage() {
 			return;
 		}
 
+		const quantity = parseFloat(form.quantity);
+		const alertQty = form.alert_quantity ? parseFloat(form.alert_quantity) : null;
+
+		if (isNaN(quantity) || quantity < 0) {
+			toast.error('Por favor, insira uma quantidade válida');
+			return;
+		}
+
+		if (alertQty !== null && (isNaN(alertQty) || alertQty < 0)) {
+			toast.error('Por favor, insira uma quantidade de alerta válida');
+			return;
+		}
+
 		try {
-			const data = {
+			const itemData = {
 				name: form.name.trim(),
 				unit_type: form.unit_type,
 				description: form.description.trim() || null,
 			};
 
 			if (editId) {
-				await updateItem(editId, data);
+				await updateItem(editId, itemData);
 				toast.success('Item atualizado com sucesso!');
 			} else {
-				await createItem(data);
-				toast.success('Item criado com sucesso!');
+				// Create item first
+				const newItem = await createItem(itemData);
+				
+				// Then create stock for the item
+				const stockData = {
+					itemId: newItem.id,
+					quantity: quantity,
+					alert_quantity: alertQty
+				};
+				await createStock(stockData);
+				
+				toast.success('Item e estoque criados com sucesso!');
 			}
 			resetForm();
 			setOpen(false);
@@ -96,6 +128,8 @@ export default function InventoryPage() {
 			name: item.name,
 			description: item.description || "",
 			unit_type: item.unit_type,
+			quantity: "",
+			alert_quantity: ""
 		});
 		setOpen(true);
 	};
@@ -130,7 +164,7 @@ export default function InventoryPage() {
 							<Package className="w-8 h-8 text-primary" />
 						</div>
 						<div>
-							<h1 className="text-3xl font-bold text-white">Controle de estoque</h1>
+							<h1 className="text-3xl font-bold text-white">Controle de itens</h1>
 							<p className="text-slate-300 mt-1">Gerencie seus ingredientes</p>
 						</div>
 					</div>
@@ -185,6 +219,37 @@ export default function InventoryPage() {
 										</SelectContent>
 									</Select>
 								</div>
+								{!editId && (
+									<>
+										<div className="space-y-1.5">
+											<label className="text-sm font-medium">Quantidade Inicial *</label>
+											<Input
+												type="number"
+												placeholder={form.unit_type === 'grams' ? "Ex: 1000 (g)" : "Ex: 10 (unidades)"}
+												value={form.quantity}
+												onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+												disabled={isLoading}
+												min="0"
+												step={form.unit_type === 'grams' ? "0.01" : "1"}
+											/>
+										</div>
+										<div className="space-y-1.5">
+											<label className="text-sm font-medium">Quantidade de Alerta (opcional)</label>
+											<Input
+												type="number"
+												placeholder={form.unit_type === 'grams' ? "Ex: 100 (g)" : "Ex: 5 (unidades)"}
+												value={form.alert_quantity}
+												onChange={(e) => setForm({ ...form, alert_quantity: e.target.value })}
+												disabled={isLoading}
+												min="0"
+												step={form.unit_type === 'grams' ? "0.01" : "1"}
+											/>
+											<p className="text-xs text-muted-foreground">
+												Você será alertado quando o estoque atingir este nível
+											</p>
+										</div>
+									</>
+								)}
 								<div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
 									<p className="font-medium mb-1">💡 Dica:</p>
 									<p><strong>Gramas:</strong> Use para ingredientes medidos por peso (farinha, açúcar, carne)</p>

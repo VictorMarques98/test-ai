@@ -69,10 +69,12 @@ export interface Product {
 export interface CreateStockDto {
   itemId: string;
   quantity: number;
+  alert_quantity?: number | null;
 }
 
 export interface UpdateStockDto {
   quantity: number; // Replaces current stock quantity
+  alert_quantity?: number | null;
 }
 
 export interface Stock {
@@ -80,6 +82,7 @@ export interface Stock {
   item_id: string;
   quantity: number;
   reserved_quantity: number;
+  alert_quantity?: number | null;
   unitType: UnitType;
   created_at?: string;
   updated_at?: string;

@@ -12,6 +12,14 @@ export default defineConfig(({ mode }) => ({
 		hmr: {
 			overlay: false,
 		},
+		proxy: {
+			'/api': {
+				target: 'https://kds-service.duckdns.org',
+				changeOrigin: true,
+				rewrite: (path) => path.replace(/^\/api/, ''),
+				secure: true,
+			},
+		},
 	},
 	plugins: [
 		react(),
