@@ -1,7 +1,7 @@
 // API DTOs based on OpenAPI specification
 
 // === Items ===
-export type UnitType = 'grams' | 'unit';
+export type UnitType = 'grams' | 'unit' | 'ml' | 'liters' | 'kg';
 
 export interface CreateItemDto {
   name: string;
@@ -93,7 +93,7 @@ export interface Stock {
 export type OrderStatus = 'request' | 'in_progress' | 'refuse' | 'canceled' | 'finish';
 
 export interface CreateOrderDto {
-  customer_name?: string | null;
+  customerId?: string | null; // UUID reference to customer
   notes?: string | null;
   products: string[]; // Array of product IDs
 }
@@ -113,8 +113,9 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  customer_name?: string | null;
+  customerId?: string | null; // UUID reference to customer
   notes?: string | null;
+  products?: string[]; // Array of product UUIDs (backend may include this)
   status: OrderStatus;
   created_at: string;
   updated_at?: string;
