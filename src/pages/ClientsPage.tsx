@@ -1,21 +1,25 @@
 import { useState, useMemo, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useRestaurantStore } from "@/store/restaurantStore";
+import { useCustomers } from "@/hooks/useCustomers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Pencil, Users, Search, ShoppingBag, Clock, CheckCircle2, X } from "lucide-react";
+import { Trash2, Plus, Pencil, Users, Search, ShoppingBag, Clock, CheckCircle2, X, Loader2, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ClientsPage() {
 	const location = useLocation();
-	const { clients, orders, dishes, addClient, updateClient, deleteClient } = useRestaurantStore();
+	const { orders, dishes } = useRestaurantStore();
+	const { customers, loading, error, createCustomer, updateCustomer, deleteCustomer } = useCustomers();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
-	const [form, setForm] = useState({ name: "", phone: "", email: "", description: "" });
+	const [form, setForm] = useState({ name: "", phone: "", email: "", address: "" });
 	const [search, setSearch] = useState("");
+	const [submitting, setSubmitting] = useState(false);
 
 	// Handle opening modal from navigation
 	useEffect(() => {
@@ -30,54 +34,66 @@ export default function ClientsPage() {
 	useEffect(() => {
 		const state = location.state as { filterClientId?: string } | null;
 		if (state?.filterClientId) {
-			const client = clients.find((c) => c.id === state.filterClientId);
+			const client = customers.find((c) => c.id === state.filterClientId);
 			if (client) {
 				setSearch(client.name);
 			}
 			// Clear the state to avoid re-applying on refresh
 			window.history.replaceState({}, document.title);
 		}
-	}, [location.state, clients]);
+	}, [location.state, customers]);
 
 	const resetForm = () => {
-		setForm({ name: "", phone: "", email: "", description: "" });
+		setForm({ name: "", phone: "", email: "", address: "" });
 		setEditId(null);
 	};
 
-	const handleSubmit = () => {
+	const handleSubmit = async () => {
 		const data = {
 			name: form.name.trim(),
-			phone: form.phone.trim(),
-			email: form.email.trim(),
-			description: form.description.trim(),
+			phone: form.phone.trim() || null,
+			email: form.email.trim() || null,
+			address: form.address.trim() || null,
 		};
 		if (!data.name) return;
-		if (editId) {
-			updateClient(editId, data);
-		} else {
-			addClient(data);
+
+		setSubmitting(true);
+		try {
+			if (editId) {
+				await updateCustomer(editId, data);
+			} else {
+				await createCustomer(data);
+			}
+			resetForm();
+			setOpen(false);
+		} finally {
+			setSubmitting(false);
 		}
-		resetForm();
-		setOpen(false);
 	};
 
-	const startEdit = (c: (typeof clients)[0]) => {
+	const startEdit = (c: (typeof customers)[0]) => {
 		setEditId(c.id);
-		setForm({ name: c.name, phone: c.phone, email: c.email, description: c.description || "" });
+		setForm({ name: c.name, phone: c.phone || "", email: c.email || "", address: c.address || "" });
 		setOpen(true);
+	};
+
+	const handleDelete = async (id: string) => {
+		if (window.confirm("Tem certeza que deseja remover este cliente?")) {
+			await deleteCustomer(id);
+		}
 	};
 
 	const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || "Desconhecido";
 
-	const filteredClients = useMemo(() => {
+	const filteredCustomers = useMemo(() => {
 		const q = search.toLowerCase();
-		if (!q) return clients;
-		return clients.filter(
-			(c) => c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.email.toLowerCase().includes(q),
+		if (!q) return customers;
+		return customers.filter(
+			(c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)) || (c.email && c.email.toLowerCase().includes(q)),
 		);
-	}, [clients, search]);
+	}, [customers, search]);
 
-	const getClientOrders = (clientId: string) => orders.filter((o) => o.clientId === clientId);
+	const getClientOrders = (customerId: string) => orders.filter((o) => o.customerId === customerId);
 
 	return (
 		<div className="space-y-6">
@@ -127,16 +143,23 @@ export default function ClientsPage() {
 									onChange={(e) => setForm({ ...form, email: e.target.value })}
 								/>
 								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Descrição (opcional)</label>
-									<textarea
-										className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-										placeholder="Adicione notas ou informações sobre o cliente..."
-										value={form.description}
-										onChange={(e) => setForm({ ...form, description: e.target.value })}
-									/>
-								</div>
-								<Button className="w-full" onClick={handleSubmit}>
-									{editId ? "Atualizar" : "Adicionar Cliente"}
+								<label className="text-sm font-medium">Endereço (opcional)</label>
+								<textarea
+									className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+									placeholder="Endereço de entrega ou localização..."
+									value={form.address}
+									onChange={(e) => setForm({ ...form, address: e.target.value })}
+								/>
+							</div>
+							<Button className="w-full" onClick={handleSubmit} disabled={submitting || !form.name.trim()}>
+								{submitting ? (
+									<>
+										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+										{editId ? "Atualizando..." : "Criando..."}
+									</>
+								) : (
+									<>{editId ? "Atualizar" : "Adicionar Cliente"}</>
+								)}
 								</Button>
 							</div>
 						</DialogContent>
@@ -163,7 +186,23 @@ export default function ClientsPage() {
 				)}
 			</div>
 
-			{filteredClients.length === 0 ? (
+			{/* Error Alert */}
+			{error && (
+				<Alert variant="destructive">
+					<AlertCircle className="h-4 w-4" />
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
+			)}
+
+			{/* Loading State */}
+			{loading ? (
+				<Card>
+					<CardContent className="flex flex-col items-center justify-center py-12">
+						<Loader2 className="w-12 h-12 text-primary mb-4 animate-spin" />
+						<p className="text-muted-foreground">Carregando clientes...</p>
+					</CardContent>
+				</Card>
+			) : filteredCustomers.length === 0 ? (
 				<Card>
 					<CardContent className="flex flex-col items-center justify-center py-12">
 						<Users className="w-12 h-12 text-muted-foreground mb-4" />
@@ -175,13 +214,13 @@ export default function ClientsPage() {
 					</CardContent>
 				</Card>
 			) : (
-				filteredClients.map((c) => {
+				filteredCustomers.map((c) => {
 					const clientOrders = getClientOrders(c.id);
-					const pendingOrders = clientOrders.filter((o) => o.status === "pending").length;
-					const confirmedOrders = clientOrders.filter((o) => o.status === "confirmed").length;
+					const pendingOrders = clientOrders.filter((o) => o.status === "request" || o.status === "in_progress").length;
+					const confirmedOrders = clientOrders.filter((o) => o.status === "finish").length;
 					const lastOrderDate =
 						clientOrders.length > 0
-							? new Date(Math.max(...clientOrders.map((o) => new Date(o.createdAt).getTime())))
+							? new Date(Math.max(...clientOrders.map((o) => new Date(o.created_at).getTime())))
 							: null;
 
 					return (
@@ -209,20 +248,20 @@ export default function ClientsPage() {
 										<Button
 											variant="ghost"
 											size="icon"
-											onClick={() => deleteClient(c.id)}
+										onClick={() => handleDelete(c.id)}
 											className="hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-600">
 											<Trash2 className="w-4 h-4" />
 										</Button>
 									</div>
 								</div>
 
-								{/* Description Section */}
-								{c.description && (
-									<div className="px-5 py-3 bg-purple-50 dark:bg-purple-950/30 border-b border-purple-200 dark:border-purple-900">
-										<p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1 uppercase tracking-wide">
-											Descrição
-										</p>
-										<p className="text-sm text-purple-900 dark:text-purple-200">{c.description}</p>
+{/* Address Section */}
+							{c.address && (
+								<div className="px-5 py-3 bg-purple-50 dark:bg-purple-950/30 border-b border-purple-200 dark:border-purple-900">
+									<p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1 uppercase tracking-wide">
+										Endereço
+									</p>
+									<p className="text-sm text-purple-900 dark:text-purple-200">{c.address}</p>
 									</div>
 								)}
 
@@ -293,22 +332,25 @@ export default function ClientsPage() {
 																key={o.id}
 																className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
 																<TableCell className="font-mono text-xs font-semibold">
-																	#{o.orderNumber}
+																	#{o.id.slice(0, 8)}
 																</TableCell>
 																<TableCell>
 																	<div className="flex flex-wrap gap-1">
-																		{o.items.map((item, i) => (
-																			<span
-																				key={i}
-																				className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium">
-																				{getDishName(item.dishId)} ×
-																				{item.quantity}
-																			</span>
-																		))}
+																		{o.order_items && o.order_items.length > 0 ? (
+																			o.order_items.map((item, i) => (
+																				<span
+																					key={i}
+																					className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-full font-medium">
+																					{item.item?.name || "Item"} ×{item.quantity}
+																				</span>
+																			))
+																		) : (
+																			<span className="text-xs text-slate-500">Sem itens</span>
+																		)}
 																	</div>
 																</TableCell>
 																<TableCell className="text-xs text-slate-600 dark:text-slate-400">
-																	{new Date(o.createdAt).toLocaleDateString("pt-BR", {
+																	{new Date(o.created_at).toLocaleDateString("pt-BR", {
 																		day: "2-digit",
 																		month: "short",
 																		year: "numeric",
@@ -317,18 +359,26 @@ export default function ClientsPage() {
 																<TableCell>
 																	<Badge
 																		variant={
-																			o.status === "pending"
+																			o.status === "request" || o.status === "in_progress"
 																				? "outline"
 																				: "default"
 																		}
 																		className={`capitalize font-bold text-xs ${
-																			o.status === "pending"
+																			o.status === "request" || o.status === "in_progress"
 																				? "bg-yellow-100 text-yellow-900 border-yellow-400 hover:bg-yellow-100"
-																				: "bg-green-100 text-green-900 border-green-400 hover:bg-green-100"
+																				: o.status === "finish"
+																				? "bg-green-100 text-green-900 border-green-400 hover:bg-green-100"
+																				: "bg-red-100 text-red-900 border-red-400 hover:bg-red-100"
 																		}`}>
-																		{o.status === "pending"
-																			? "Em andamento"
-																			: "Finalizado"}
+																		{o.status === "request"
+																			? "Solicitado"
+																			: o.status === "in_progress"
+																			? "Em Andamento"
+																			: o.status === "finish"
+																			? "Finalizado"
+																			: o.status === "canceled"
+																			? "Cancelado"
+																			: "Recusado"}
 																	</Badge>
 																</TableCell>
 															</TableRow>

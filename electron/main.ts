@@ -33,6 +33,23 @@ const createWindow = () => {
 		show: false, // Don't show until ready-to-show
 	});
 
+	// Configure CSP to allow API requests
+	mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+		callback({
+			responseHeaders: {
+				...details.responseHeaders,
+				'Content-Security-Policy': [
+					"default-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+					"connect-src 'self' https://kds-service.duckdns.org http://localhost:* ws://localhost:* wss://localhost:*; " +
+					"img-src 'self' data: https:; " +
+					"script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+					"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+					"font-src 'self' data: https://fonts.gstatic.com;"
+				]
+			}
+		});
+	});
+
 	// Load the app
 	if (process.env.VITE_DEV_SERVER_URL) {
 		mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);

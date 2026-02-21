@@ -1,25 +1,47 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { useRestaurantStore } from "@/store/restaurantStore";
+import { useRestaurantStore } from "@/store/restaurantStoreApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Plus, Pencil, UtensilsCrossed, X, AlertCircle } from "lucide-react";
+import { Trash2, Plus, Pencil, UtensilsCrossed, X, AlertCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DishIngredient } from "@/types/restaurant";
+import { ProductItemDto } from "@/types/api";
+import { toast } from "sonner";
 
 export default function DishesPage() {
 	const location = useLocation();
-	const { dishes, products, addDish, updateDish, deleteDish } = useRestaurantStore();
+	const { 
+		products, 
+		items,
+		isLoading,
+		error,
+		fetchProducts, 
+		fetchItems,
+		createProduct, 
+		updateProduct, 
+		deleteProduct,
+		clearError 
+	} = useRestaurantStore();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
 	const [name, setName] = useState("");
-	const [priceSmall, setPriceSmall] = useState("");
-	const [priceMedium, setPriceMedium] = useState("");
-	const [priceLarge, setPriceLarge] = useState("");
-	const [ingredients, setIngredients] = useState<DishIngredient[]>([]);
+	const [description, setDescription] = useState("");
+	const [price, setPrice] = useState("");
+	const [buyPrice, setBuyPrice] = useState("");
+	const [productItems, setProductItems] = useState<ProductItemDto[]>([]);
+
+	// Fetch data on mount
+	useEffect(() => {
+		Promise.all([
+			fetchProducts(),
+			fetchItems()
+		]).catch(err => {
+			console.error('Failed to load data:', err);
+		});
+	}, [fetchProducts, fetchItems]);
 
 	// Handle opening modal from navigation
 	useEffect(() => {
@@ -30,63 +52,103 @@ export default function DishesPage() {
 		}
 	}, [location.state]);
 
+	// Auto-clear errors after 5 seconds
+	useEffect(() => {
+		if (error) {
+			const timer = setTimeout(() => {
+				clearError();
+			}, 5000);
+			return () => clearTimeout(timer);
+		}
+	}, [error, clearError]);
+
 	const resetForm = () => {
 		setName("");
-		setPriceSmall("");
-		setPriceMedium("");
-		setPriceLarge("");
-		setIngredients([]);
+		setDescription("");
+		setPrice("");
+		setBuyPrice("");
+		setProductItems([]);
 		setEditId(null);
 	};
 
-	const handleSubmit = () => {
-		if (!name.trim() || ingredients.length === 0) return;
-		const data = {
-			name: name.trim(),
-			priceSmall: Number(priceSmall) || 0,
-			priceMedium: Number(priceMedium) || 0,
-			priceLarge: Number(priceLarge) || 0,
-			ingredients,
-		};
-		if (editId) {
-			updateDish(editId, data);
-		} else {
-			addDish(data);
+	const handleSubmit = async () => {
+		if (!name.trim() || productItems.length === 0) {
+			toast.error('Por favor, preencha o nome e adicione pelo menos um ingrediente');
+			return;
 		}
-		resetForm();
-		setOpen(false);
+
+		try {
+			const data = {
+				name: name.trim(),
+				description: description.trim() || undefined,
+				price: price ? Number(price) : undefined,
+				buyPrice: buyPrice ? Number(buyPrice) : undefined,
+				items: productItems,
+			};
+
+			if (editId) {
+				await updateProduct(editId, data);
+				toast.success('Prato atualizado com sucesso!');
+			} else {
+				await createProduct(data);
+				toast.success('Prato criado com sucesso!');
+			}
+			resetForm();
+			setOpen(false);
+		} catch (error: any) {
+			toast.error(error.message || 'Falha ao salvar prato');
+		}
 	};
 
-	const startEdit = (d: (typeof dishes)[0]) => {
-		setEditId(d.id);
-		setName(d.name);
-		setPriceSmall(String(d.priceSmall));
-		setPriceMedium(String(d.priceMedium));
-		setPriceLarge(String(d.priceLarge));
-		setIngredients([...d.ingredients]);
+	const startEdit = (product: (typeof products)[0]) => {
+		setEditId(product.id);
+		setName(product.name);
+		setDescription(product.description || "");
+		setPrice(product.price ? String(product.price) : "");
+		setBuyPrice(product.buyPrice ? String(product.buyPrice) : "");
+		
+		// Map product_items to ProductItemDto format
+		const mappedItems: ProductItemDto[] = (product.product_items || []).map(pi => ({
+			itemId: pi.item_id,
+			quantity: pi.quantity
+		}));
+		setProductItems(mappedItems);
 		setOpen(true);
 	};
 
 	const addIngredient = () => {
-		if (products.length === 0) return;
-		setIngredients([
-			...ingredients,
-			{ productId: products[0].id, quantitySmall: 1, quantityMedium: 1, quantityLarge: 1 },
+		if (items.length === 0) return;
+		setProductItems([
+			...productItems,
+			{ itemId: items[0].id, quantity: 1 },
 		]);
 	};
 
-	const updateIngredient = (idx: number, field: keyof DishIngredient, value: string | number) => {
-		const updated = [...ingredients];
-		updated[idx] = { ...updated[idx], [field]: field.startsWith("quantity") ? Number(value) : value };
-		setIngredients(updated);
+	const updateIngredient = (idx: number, field: keyof ProductItemDto, value: string | number) => {
+		const updated = [...productItems];
+		updated[idx] = { ...updated[idx], [field]: field === "quantity" ? Number(value) : value };
+		setProductItems(updated);
 	};
 
 	const removeIngredient = (idx: number) => {
-		setIngredients(ingredients.filter((_, i) => i !== idx));
+		setProductItems(productItems.filter((_, i) => i !== idx));
 	};
 
-	const getProductName = (id: string) => products.find((p) => p.id === id)?.name || "Desconhecido";
-	const getProductUnit = (id: string) => products.find((p) => p.id === id)?.unit || "";
+	const getItemName = (id: string) => items.find((i) => i.id === id)?.name || "Desconhecido";
+	const getItemUnit = (id: string) => {
+		const item = items.find((i) => i.id === id);
+		if (!item) return "";
+		
+		const unitMap = {
+			grams: 'g',
+			kg: 'kg',
+			ml: 'ml',
+			liters: 'L',
+			unit: 'un'
+		};
+		
+		return unitMap[item.unit_type] || "";
+	};
 
 	return (
 		<div className="space-y-6">
@@ -109,9 +171,9 @@ export default function DishesPage() {
 							if (!v) resetForm();
 						}}>
 						<DialogTrigger asChild>
-							<Button size="lg" className="shadow-lg" disabled={products.length === 0}>
+							<Button size="lg" className="shadow-lg" disabled={items.length === 0 || isLoading}>
 								<Plus className="w-4 h-4 mr-2" />
-								{products.length === 0 ? "Adicione produtos primeiro" : "Novo Prato"}
+								{items.length === 0 ? "Adicione ingredientes primeiro" : "Novo Prato"}
 							</Button>
 						</DialogTrigger>
 						<DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
@@ -120,7 +182,7 @@ export default function DishesPage() {
 							</DialogHeader>
 							<div className="space-y-4 mt-2 overflow-y-auto px-2">
 								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Nome do Prato</label>
+									<label className="text-sm font-medium">Nome do Prato *</label>
 									<Input
 										placeholder="Nome do prato"
 										value={name}
@@ -128,175 +190,95 @@ export default function DishesPage() {
 									/>
 								</div>
 								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Preços por Tamanho</label>
-									<div className="grid grid-cols-3 gap-2">
-										<div className="space-y-1.5">
-											<label className="text-xs font-medium text-muted-foreground">Pequeno</label>
-											<Input
-												type="number"
-												placeholder="$"
-												value={priceSmall}
-												onChange={(e) => setPriceSmall(e.target.value)}
-											/>
-										</div>
-										<div className="space-y-1.5">
-											<label className="text-xs font-medium text-muted-foreground">Medio</label>
-											<Input
-												type="number"
-												placeholder="$"
-												value={priceMedium}
-												onChange={(e) => setPriceMedium(e.target.value)}
-											/>
-										</div>
-										<div className="space-y-1.5">
-											<label className="text-xs font-medium text-muted-foreground">Grande</label>
-											<Input
-												type="number"
-												placeholder="$"
-												value={priceLarge}
-												onChange={(e) => setPriceLarge(e.target.value)}
-											/>
-										</div>
+									<label className="text-sm font-medium">Descrição</label>
+									<Input
+										placeholder="Descrição do prato (opcional)"
+										value={description}
+										onChange={(e) => setDescription(e.target.value)}
+									/>
+								</div>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Preço de Venda</label>
+										<Input
+											type="number"
+											placeholder="$"
+											step="0.01"
+											value={price}
+											onChange={(e) => setPrice(e.target.value)}
+										/>
+									</div>
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Custo</label>
+										<Input
+											type="number"
+											placeholder="$"
+											step="0.01"
+											value={buyPrice}
+											onChange={(e) => setBuyPrice(e.target.value)}
+										/>
 									</div>
 								</div>
 								<div>
 									<div className="flex items-center justify-between mb-2">
-										<p className="text-sm font-medium">Ingredientes</p>
+										<p className="text-sm font-medium">Ingredientes *</p>
 										<Button variant="outline" size="sm" onClick={addIngredient}>
 											<Plus className="w-3 h-3 mr-1" />
 											Adicionar
 										</Button>
 									</div>
 									<div className="space-y-3">
-										{ingredients.map((ing, idx) => (
-											<div key={idx} className="space-y-2 p-3 border rounded-lg bg-secondary/30">
-												<div className="flex items-center gap-2">
-													<Select
-														value={ing.productId}
-														onValueChange={(v) => updateIngredient(idx, "productId", v)}>
-														<SelectTrigger className="flex-1">
-															<SelectValue />
-														</SelectTrigger>
-														<SelectContent>
-															{products.map((p) => (
-																<SelectItem key={p.id} value={p.id}>
-																	{p.name}
-																</SelectItem>
-															))}
-														</SelectContent>
-													</Select>
-													<Button
-														variant="ghost"
-														size="icon"
-														className="shrink-0"
-														onClick={() => removeIngredient(idx)}>
-														<X className="w-4 h-4" />
-													</Button>
+										{productItems.map((item, idx) => (
+											<div key={idx} className="flex items-center gap-2 p-3 border rounded-lg bg-secondary/30">
+												<Select
+													value={item.itemId}
+													onValueChange={(v) => updateIngredient(idx, "itemId", v)}>
+													<SelectTrigger className="flex-1">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														{items.map((i) => (
+															<SelectItem key={i.id} value={i.id}>
+																{i.name}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+												<div className="flex items-center gap-1 min-w-[120px]">
+													<Input
+														type="number"
+														step="0.1"
+														className="text-sm w-20"
+														value={item.quantity}
+														onChange={(e) => updateIngredient(idx, "quantity", e.target.value)}
+													/>
+													<span className="text-xs text-muted-foreground min-w-[30px]">
+														{getItemUnit(item.itemId)}
+													</span>
 												</div>
-												<div className="grid grid-cols-3 gap-2">
-													<div className="space-y-1">
-														<label className="text-xs font-medium text-muted-foreground">
-															Pequeno
-														</label>
-														<div className="flex items-center gap-1">
-															<Input
-																type="number"
-																step="0.1"
-																className="text-sm"
-																value={ing.quantitySmall}
-																onChange={(e) =>
-																	updateIngredient(
-																		idx,
-																		"quantitySmall",
-																		e.target.value,
-																	)
-																}
-															/>
-															<span className="text-xs text-muted-foreground min-w-8">
-																{getProductUnit(ing.productId)}
-															</span>
-														</div>
-													</div>
-													<div className="space-y-1">
-														<label className="text-xs font-medium text-muted-foreground">
-															Médio
-														</label>
-														<div className="flex items-center gap-1">
-															<Input
-																type="number"
-																step="0.1"
-																className="text-sm"
-																value={ing.quantityMedium}
-																onChange={(e) =>
-																	updateIngredient(
-																		idx,
-																		"quantityMedium",
-																		e.target.value,
-																	)
-																}
-															/>
-															<span className="text-xs text-muted-foreground min-w-8">
-																{getProductUnit(ing.productId)}
-															</span>
-														</div>
-													</div>
-													<div className="space-y-1">
-														<label className="text-xs font-medium text-muted-foreground">
-															Grande
-														</label>
-														<div className="flex items-center gap-1">
-															<Input
-																type="number"
-																step="0.1"
-																className="text-sm"
-																value={ing.quantityLarge}
-																onChange={(e) =>
-																	updateIngredient(
-																		idx,
-																		"quantityLarge",
-																		e.target.value,
-																	)
-																}
-															/>
-															<span className="text-xs text-muted-foreground min-w-8">
-																{getProductUnit(ing.productId)}
-															</span>
-														</div>
-													</div>
-												</div>
+												<Button
+													variant="ghost"
+													size="icon"
+													className="shrink-0"
+													onClick={() => removeIngredient(idx)}>
+													<X className="w-4 h-4" />
+												</Button>
 											</div>
 										))}
 									</div>
 								</div>
-								{(!priceSmall || !priceMedium || !priceLarge) && (
-									<Alert
-										variant="destructive"
-										className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
-										<div className="flex items-start gap-3">
-											<AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
-											<div className="flex-1">
-												<AlertDescription className="text-amber-800 dark:text-amber-300 font-medium">
-													Todos os campos de preço são obrigatórios
-												</AlertDescription>
-												<p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-													Por favor, insira um preço para os tamanhos Pequeno, Médio e Grande
-													para continuar.
-												</p>
-											</div>
-										</div>
-									</Alert>
-								)}
 								<Button
 									className="w-full"
 									onClick={handleSubmit}
-									disabled={
-										!name.trim() ||
-										ingredients.length === 0 ||
-										!priceSmall ||
-										!priceMedium ||
-										!priceLarge
-									}>
-									{editId ? "Atualizar" : "Criar Prato"}
+									disabled={!name.trim() || productItems.length === 0 || isLoading}>
+									{isLoading ? (
+										<>
+											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+											{editId ? "Atualizando..." : "Criando..."}
+										</>
+									) : (
+										editId ? "Atualizar Prato" : "Criar Prato"
+									)}
 								</Button>
 							</div>
 						</DialogContent>
@@ -304,7 +286,22 @@ export default function DishesPage() {
 				</div>
 			</div>
 
-			{dishes.length === 0 ? (
+			{/* Error Alert */}
+			{error && (
+				<Alert variant="destructive">
+					<AlertCircle className="h-4 w-4" />
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
+			)}
+
+			{isLoading && products.length === 0 ? (
+				<Card>
+					<CardContent className="flex flex-col items-center justify-center py-12">
+						<Loader2 className="w-12 h-12 text-muted-foreground mb-4 animate-spin" />
+						<p className="text-muted-foreground">Carregando pratos...</p>
+					</CardContent>
+				</Card>
+			) : products.length === 0 ? (
 				<Card>
 					<CardContent className="flex flex-col items-center justify-center py-12">
 						<UtensilsCrossed className="w-12 h-12 text-muted-foreground mb-4" />
@@ -313,42 +310,54 @@ export default function DishesPage() {
 				</Card>
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-					{dishes.map((d) => (
-						<Card key={d.id} className="overflow-hidden flex flex-col">
+					{products.map((product) => (
+						<Card key={product.id} className="overflow-hidden flex flex-col">
 							<CardContent className="p-0 flex flex-col h-full">
 								<div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-b flex-shrink-0">
 									<div className="flex items-start justify-between mb-2">
 										<div className="flex-1 min-w-0">
-											<p className="font-bold text-lg truncate">{d.name}</p>
-											<div className="flex gap-2 mt-1 text-sm">
-												<span className="text-muted-foreground">
-													P:{" "}
-													<span className="font-bold text-primary">
-														${d.priceSmall.toFixed(2)}
+											<p className="font-bold text-lg truncate">{product.name}</p>
+											{product.description && (
+												<p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+													{product.description}
+												</p>
+											)}
+											<div className="flex gap-3 mt-2 text-sm">
+												{product.price && (
+													<span className="text-muted-foreground">
+														Venda:{" "}
+														<span className="font-bold text-primary">
+															${Number(product.price).toFixed(2)}
+														</span>
 													</span>
-												</span>
-												<span className="text-muted-foreground">
-													M:{" "}
-													<span className="font-bold text-primary">
-														${d.priceMedium.toFixed(2)}
+												)}
+												{product.buyPrice && (
+													<span className="text-muted-foreground">
+														Custo:{" "}
+														<span className="font-semibold text-foreground">
+															${Number(product.buyPrice).toFixed(2)}
+														</span>
 													</span>
-												</span>
-												<span className="text-muted-foreground">
-													G:{" "}
-													<span className="font-bold text-primary">
-														${d.priceLarge.toFixed(2)}
-													</span>
-												</span>
+												)}
 											</div>
 										</div>
 										<div className="flex gap-1 ml-2">
-											<Button variant="ghost" size="icon" onClick={() => startEdit(d)}>
+											<Button variant="ghost" size="icon" onClick={() => startEdit(product)}>
 												<Pencil className="w-4 h-4" />
 											</Button>
 											<Button
 												variant="ghost"
 												size="icon"
-												onClick={() => deleteDish(d.id)}
+												onClick={async () => {
+													if (confirm('Tem certeza que deseja excluir este prato?')) {
+														try {
+															await deleteProduct(product.id);
+															toast.success('Prato excluído com sucesso!');
+														} catch (error: any) {
+															toast.error(error.message || 'Falha ao excluir prato');
+														}
+													}
+												}}
 												className="hover:bg-destructive/10 hover:text-destructive">
 												<Trash2 className="w-4 h-4" />
 											</Button>
@@ -360,24 +369,22 @@ export default function DishesPage() {
 										Ingredientes
 									</p>
 									<div className="space-y-2">
-										{d.ingredients.map((ing, i) => (
-											<div key={i} className="text-xs bg-secondary/50 p-2 rounded">
-												<div className="font-semibold mb-1">
-													{getProductName(ing.productId)}
+										{(product.product_items || []).length === 0 ? (
+											<p className="text-xs text-muted-foreground italic">
+												Nenhum ingrediente
+											</p>
+										) : (
+											(product.product_items || []).map((pi, i) => (
+												<div key={i} className="text-xs bg-secondary/50 p-2 rounded">
+													<div className="font-semibold">
+														{pi.item?.name || getItemName(pi.item_id)}
+													</div>
+													<div className="text-muted-foreground">
+														{pi.quantity} {getItemUnit(pi.item_id)}
+													</div>
 												</div>
-												<div className="flex gap-2 text-muted-foreground">
-													<span>
-														P: {ing.quantitySmall} {getProductUnit(ing.productId)}
-													</span>
-													<span>
-														M: {ing.quantityMedium} {getProductUnit(ing.productId)}
-													</span>
-													<span>
-														G: {ing.quantityLarge} {getProductUnit(ing.productId)}
-													</span>
-												</div>
-											</div>
-										))}
+											))
+										)}
 									</div>
 								</div>
 							</CardContent>

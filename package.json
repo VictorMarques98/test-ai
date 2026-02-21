@@ -6,7 +6,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
-		"dev:electron": "npm run build:electron && electron .",
+		"dev:electron": "vite",
 		"build": "vite build",
 		"build:electron": "tsc -p tsconfig.electron.json",
 		"build:dev": "vite build --mode development",
@@ -49,6 +49,7 @@
 		"@radix-ui/react-toggle-group": "^1.1.10",
 		"@radix-ui/react-tooltip": "^1.2.7",
 		"@tanstack/react-query": "^5.83.0",
+		"axios": "^1.13.5",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"cmdk": "^1.1.1",

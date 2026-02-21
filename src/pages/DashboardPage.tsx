@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useRestaurantStore } from "@/store/restaurantStore";
+import { useRestaurantStore } from "@/store/restaurantStoreApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -7,12 +8,21 @@ import { Package, UtensilsCrossed, ClipboardList, AlertTriangle, ArrowRight, Plu
 
 export default function DashboardPage() {
 	const navigate = useNavigate();
-	const { products, dishes, orders } = useRestaurantStore();
-	const pendingOrders = orders.filter((o) => o.status === "pending");
+	const { products, orders, fetchProducts, fetchOrders } = useRestaurantStore();
+	const pendingOrders = orders.filter((o) => o.status === "request" || o.status === "in_progress");
+
+	// Fetch data on mount
+	useEffect(() => {
+		Promise.all([
+			fetchProducts(),
+			fetchOrders()
+		]).catch(err => {
+			console.error('Failed to load dashboard data:', err);
+		});
+	}, [fetchProducts, fetchOrders]);
 
 	const stats = [
-		{ label: "Estoque", value: products.length, icon: Package, color: "text-primary" },
-		{ label: "Cardapio", value: dishes.length, icon: UtensilsCrossed, color: "text-primary" },
+		{ label: "Produtos", value: products.length, icon: Package, color: "text-primary" },
 		{ label: "Pedidos", value: orders.length, icon: ClipboardList, color: "text-primary" },
 	];
 
@@ -68,13 +78,7 @@ export default function DashboardPage() {
 							<Users className="w-6 h-6" />
 							<span className="text-sm font-medium">Novo Cliente</span>
 						</Button>
-						<Button
-							variant="outline"
-							className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary/5 hover:border-primary hover:text-primary"
-							onClick={() => navigate("/dishes", { state: { openModal: true } })}>
-							<UtensilsCrossed className="w-6 h-6" />
-							<span className="text-sm font-medium">Novo Prato</span>
-						</Button>
+
 					</div>
 				</CardContent>
 			</Card>
@@ -91,6 +95,7 @@ export default function DashboardPage() {
 							<TableHeader>
 								<TableRow>
 									<TableHead>ID do Pedido</TableHead>
+									<TableHead>Status</TableHead>
 									<TableHead>Data de Criação</TableHead>
 									<TableHead className="text-right">Ações</TableHead>
 								</TableRow>
@@ -98,9 +103,22 @@ export default function DashboardPage() {
 							<TableBody>
 								{pendingOrders.map((o) => (
 									<TableRow key={o.id}>
-										<TableCell className="font-mono">#{o.orderNumber}</TableCell>
+										<TableCell className="font-mono">#{o.id.slice(0, 8)}</TableCell>
+										<TableCell>
+											<span className={`text-xs font-medium px-2 py-1 rounded-full ${
+												o.status === "request" 
+													? "bg-yellow-100 text-yellow-800" 
+													: "bg-blue-100 text-blue-800"
+											}`}>
+												{o.status === "request" ? "Pendente" : "Em Andamento"}
+											</span>
+										</TableCell>
 										<TableCell className="text-muted-foreground">
-											{new Date(o.createdAt).toLocaleDateString()}
+											{new Date(o.created_at).toLocaleDateString("pt-BR", {
+												day: "2-digit",
+												month: "short",
+												year: "numeric"
+											})}
 										</TableCell>
 										<TableCell className="text-right">
 											<Button
@@ -108,7 +126,7 @@ export default function DashboardPage() {
 												size="sm"
 												onClick={() =>
 													navigate("/orders", {
-														state: { filterOrderNumber: o.orderNumber.toString() },
+														state: { filterOrderNumber: o.id.slice(0, 8) },
 													})
 												}
 												className="gap-1">

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useRestaurantStore, checkOrderFeasibility } from "@/store/restaurantStore";
+import { useRestaurantStore } from "@/store/restaurantStoreApi";
+import { useCustomers } from "@/hooks/useCustomers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -17,34 +18,54 @@ import {
 	ChevronUp,
 	Edit,
 	UserPlus,
+	Loader2,
+	AlertCircle,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 export default function OrdersPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { orders, dishes, products, clients, addOrder, updateOrder, confirmOrder, deleteOrder, addClient } =
-		useRestaurantStore();
+	const { 
+		orders, 
+		products,
+		isLoading,
+		error,
+		fetchOrders, 
+		fetchProducts,
+		createOrder, 
+		updateOrderStatus,
+		clearError 
+	} = useRestaurantStore();
+	const { customers, loading: customersLoading } = useCustomers();
 	const [open, setOpen] = useState(false);
-	const [items, setItems] = useState<{ dishId: string; quantity: number; size: "small" | "medium" | "large" }[]>([]);
-	const [selectedClientId, setSelectedClientId] = useState<string>("");
-	const [description, setDescription] = useState<string>("");
+	const [selectedProducts, setSelectedProducts] = useState<{ productId: string; quantity: number }[]>([]);
+	const [customerId, setCustomerId] = useState<string>("");
+	const [notes, setNotes] = useState<string>("");
 	const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
-
-	// Client form states
-	const [clientModalOpen, setClientModalOpen] = useState(false);
-	const [clientForm, setClientForm] = useState({ name: "", phone: "", email: "", description: "" });
+	const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
 	// Filter states
 	const [filtersExpanded, setFiltersExpanded] = useState(false);
 	const [filterStatus, setFilterStatus] = useState<string>("all");
-	const [filterClient, setFilterClient] = useState<string>("all");
 	const [filterOrderNumber, setFilterOrderNumber] = useState<string>("");
 	const [filterDateFrom, setFilterDateFrom] = useState<string>("");
 	const [filterDateTo, setFilterDateTo] = useState<string>("");
+
+	// Fetch data on mount
+	useEffect(() => {
+		Promise.all([
+			fetchOrders(),
+			fetchProducts()
+		]).catch(err => {
+			console.error('Failed to load data:', err);
+		});
+	}, [fetchOrders, fetchProducts]);
 
 	// Handle opening modal from navigation
 	useEffect(() => {
@@ -66,99 +87,120 @@ export default function OrdersPage() {
 		}
 	}, [location.state]);
 
+	// Auto-clear errors after 5 seconds
+	useEffect(() => {
+		if (error) {
+			const timer = setTimeout(() => {
+				clearError();
+			}, 5000);
+			return () => clearTimeout(timer);
+		}
+	}, [error, clearError]);
+
 	const addItem = () => {
-		if (dishes.length === 0) return;
-		setItems([...items, { dishId: dishes[0].id, quantity: 1, size: "medium" }]);
+		if (products.length === 0) return;
+		setSelectedProducts([...selectedProducts, { productId: products[0].id, quantity: 1 }]);
 	};
 
 	const updateItem = (idx: number, field: string, value: string | number) => {
-		const updated = [...items];
+		const updated = [...selectedProducts];
 		updated[idx] = { ...updated[idx], [field]: field === "quantity" ? Number(value) : value };
-		setItems(updated);
+		setSelectedProducts(updated);
 	};
 
-	const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+	const removeItem = (idx: number) => setSelectedProducts(selectedProducts.filter((_, i) => i !== idx));
 
-	const feasibility = useMemo(
-		() => (items.length > 0 ? checkOrderFeasibility(items, dishes, products) : null),
-		[items, dishes, products],
-	);
-
-	const handleSubmit = () => {
-		if (items.length === 0) return;
-		if (editingOrderId) {
-			updateOrder(editingOrderId, items, selectedClientId || undefined, description || undefined);
-		} else {
-			addOrder(items, selectedClientId || undefined, description || undefined);
+	const handleSubmit = async () => {
+		if (selectedProducts.length === 0) {
+			setSubmitMessage({ type: 'error', text: 'Adicione pelo menos um produto ao pedido' });
+			return;
 		}
-		setItems([]);
-		setSelectedClientId("");
-		setDescription("");
-		setEditingOrderId(null);
-		setOpen(false);
+
+		setSubmitMessage(null);
+
+		try {
+			// Build products array by repeating product IDs based on quantity
+			const productsArray: string[] = [];
+			selectedProducts.forEach(item => {
+				for (let i = 0; i < item.quantity; i++) {
+					productsArray.push(item.productId);
+				}
+			});
+
+			const data = {
+				customerId: customerId && customerId !== "none" ? customerId : undefined,
+				notes: notes.trim() || undefined,
+				products: productsArray,
+			};
+
+			if (editingOrderId) {
+				// Backend doesn't support editing orders, so we show a message
+				setSubmitMessage({ type: 'error', text: 'Edição de pedidos não suportada pelo backend ainda' });
+				return;
+			} else {
+				await createOrder(data);
+				setSubmitMessage({ type: 'success', text: 'Pedido criado com sucesso!' });
+				setTimeout(() => {
+					setSelectedProducts([]);
+					setCustomerId("");
+					setNotes("");
+					setEditingOrderId(null);
+					setSubmitMessage(null);
+					setOpen(false);
+				}, 1500);
+			}
+		} catch (error: any) {
+			setSubmitMessage({ type: 'error', text: error.message || 'Falha ao criar pedido' });
+		}
 	};
 
-	const startEditOrder = (order: (typeof orders)[0]) => {
-		setItems(order.items);
-		setSelectedClientId(order.clientId || "");
-		setDescription(order.description || "");
-		setEditingOrderId(order.id);
-		setOpen(true);
-	};
+	const getProductName = (id: string) => products.find((p) => p.id === id)?.name || "Desconhecido";
+	const getProductPrice = (id: string) => products.find((p) => p.id === id)?.price || 0;
 
-	const getDishName = (id: string) => dishes.find((d) => d.id === id)?.name || "Desconhecido";
-	const getClientName = (id?: string) => (id ? clients.find((c) => c.id === id)?.name || "Desconhecido" : "—");
-
-	const handleAddClient = () => {
-		const data = {
-			name: clientForm.name.trim(),
-			phone: clientForm.phone.trim(),
-			email: clientForm.email.trim(),
-			description: clientForm.description.trim(),
-		};
-		if (!data.name) return;
-		const newClientId = addClient(data);
-		setSelectedClientId(newClientId);
-		setClientForm({ name: "", phone: "", email: "", description: "" });
-		setClientModalOpen(false);
-	};
-
-	const calculateOrderTotal = (orderItems: typeof items) => {
-		return orderItems.reduce((total, item) => {
-			const dish = dishes.find((d) => d.id === item.dishId);
-			if (!dish) return total;
-			const price =
-				item.size === "small" ? dish.priceSmall : item.size === "medium" ? dish.priceMedium : dish.priceLarge;
-			return total + price * item.quantity;
+	const calculateOrderTotal = (orderProducts: string[]) => {
+		return orderProducts.reduce((total, productId) => {
+			const product = products.find((p) => p.id === productId);
+			return total + (Number(product?.price) || 0);
 		}, 0);
 	};
 
-	const handleClientClick = (clientId?: string) => {
-		if (clientId) {
-			navigate("/clients", { state: { filterClientId: clientId } });
-		}
+	const getCustomerName = (customerId?: string | null) => {
+		if (!customerId) return "Cliente não informado";
+		const customer = customers.find((c) => c.id === customerId);
+		return customer?.name || "Cliente não encontrado";
 	};
 
 	const statusColor = (s: string) => {
-		if (s === "pending") return "outline";
-		if (s === "confirmed") return "default";
+		if (s === "request") return "outline";
+		if (s === "in_progress") return "default";
+		if (s === "finish") return "secondary";
+		if (s === "refuse" || s === "canceled") return "destructive";
 		return "outline";
+	};
+
+	const statusLabel = (s: string) => {
+		if (s === "request") return "Pendente";
+		if (s === "in_progress") return "Em Andamento";
+		if (s === "finish") return "Finalizado";
+		if (s === "refuse") return "Recusado";
+		if (s === "canceled") return "Cancelado";
+		return s;
 	};
 
 	// Apply filters
 	const filteredOrders = useMemo(() => {
 		return orders.filter((order) => {
+			// Skip invalid orders
+			if (!order || !order.id || !order.status || !order.created_at) return false;
+			
 			// Status filter
 			if (filterStatus !== "all" && order.status !== filterStatus) return false;
 
-			// Client filter
-			if (filterClient !== "all" && order.clientId !== filterClient) return false;
-
-			// Order Number filter
-			if (filterOrderNumber && !order.orderNumber.toString().includes(filterOrderNumber)) return false;
+			// Order Number filter - search in order ID since backend doesn't have orderNumber
+			if (filterOrderNumber && !order.id.includes(filterOrderNumber)) return false;
 
 			// Date range filter
-			const orderDate = new Date(order.createdAt);
+			const orderDate = new Date(order.created_at);
 			if (filterDateFrom) {
 				const fromDate = new Date(filterDateFrom);
 				fromDate.setHours(0, 0, 0, 0);
@@ -172,20 +214,18 @@ export default function OrdersPage() {
 
 			return true;
 		});
-	}, [orders, filterStatus, filterClient, filterOrderNumber, filterDateFrom, filterDateTo]);
+	}, [orders, filterStatus, filterOrderNumber, filterDateFrom, filterDateTo]);
 
 	const sortedOrders = [...filteredOrders].reverse();
 
 	const hasActiveFilters =
 		filterStatus !== "all" ||
-		filterClient !== "all" ||
 		filterOrderNumber !== "" ||
 		filterDateFrom !== "" ||
 		filterDateTo !== "";
 
 	const clearFilters = () => {
 		setFilterStatus("all");
-		setFilterClient("all");
 		setFilterOrderNumber("");
 		setFilterDateFrom("");
 		setFilterDateTo("");
@@ -212,156 +252,100 @@ export default function OrdersPage() {
 						onOpenChange={(v) => {
 							setOpen(v);
 							if (!v) {
-								setItems([]);
-								setSelectedClientId("");
-								setDescription("");
+								setSelectedProducts([]);
+								setCustomerId("");
+								setNotes("");
 								setEditingOrderId(null);
 							}
 						}}>
 						<DialogTrigger asChild>
-							<Button size="lg" className="shadow-lg" disabled={dishes.length === 0}>
+							<Button size="lg" className="shadow-lg" disabled={products.length === 0 || isLoading}>
 								<Plus className="w-4 h-4 mr-2" />
-								{dishes.length === 0 ? "Adicione os pratos primeiros" : "Novo pedido"}
+								{products.length === 0 ? "Adicione os pratos primeiro" : "Novo pedido"}
 							</Button>
 						</DialogTrigger>
-						<DialogContent className="max-w-lg">
+						<DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
 							<DialogHeader>
 								<DialogTitle>{editingOrderId ? "Editar Pedido" : "Novo pedido"}</DialogTitle>
 							</DialogHeader>
-							<div className="space-y-4 mt-2">
+							<div className="space-y-4 mt-2 overflow-y-auto px-2">
+								{submitMessage && (
+									<Alert variant={submitMessage.type === 'error' ? 'destructive' : 'default'} className={submitMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-900' : ''}>
+										{submitMessage.type === 'error' ? (
+											<AlertCircle className="h-4 w-4" />
+										) : (
+											<CheckCircle2 className="h-4 w-4" />
+										)}
+										<AlertDescription>{submitMessage.text}</AlertDescription>
+									</Alert>
+								)}
 								<div className="space-y-1.5">
 									<div className="flex items-center justify-between">
-										<label className="text-sm font-medium">Cliente</label>
-										<Dialog open={clientModalOpen} onOpenChange={setClientModalOpen}>
-											<DialogTrigger asChild>
-												<Button variant="ghost" size="sm" className="h-7 text-xs">
-													<UserPlus className="w-3 h-3 mr-1" />
-													Novo Cliente
-												</Button>
-											</DialogTrigger>
-											<DialogContent>
-												<DialogHeader>
-													<DialogTitle>Novo Cliente</DialogTitle>
-												</DialogHeader>
-												<div className="space-y-4 mt-2">
-													<div className="space-y-1.5">
-														<label className="text-sm font-medium">Nome</label>
-														<Input
-															placeholder="Nome do cliente"
-															value={clientForm.name}
-															onChange={(e) =>
-																setClientForm({ ...clientForm, name: e.target.value })
-															}
-														/>
-													</div>
-													<div className="space-y-1.5">
-														<label className="text-sm font-medium">Telefone</label>
-														<Input
-															placeholder="Telefone"
-															value={clientForm.phone}
-															onChange={(e) =>
-																setClientForm({ ...clientForm, phone: e.target.value })
-															}
-														/>
-													</div>
-													<div className="space-y-1.5">
-														<label className="text-sm font-medium">Email</label>
-														<Input
-															placeholder="Email"
-															type="email"
-															value={clientForm.email}
-															onChange={(e) =>
-																setClientForm({ ...clientForm, email: e.target.value })
-															}
-														/>
-													</div>
-													<div className="space-y-1.5">
-														<label className="text-sm font-medium">
-															Observação do cliente (opcional)
-														</label>
-														<textarea
-															className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-															placeholder="Adicione notas ou informações sobre o cliente..."
-															value={clientForm.description}
-															onChange={(e) =>
-																setClientForm({
-																	...clientForm,
-																	description: e.target.value,
-																})
-															}
-														/>
-													</div>
-													<Button className="w-full" onClick={handleAddClient}>
-														Adicionar Cliente
-													</Button>
-												</div>
-											</DialogContent>
-										</Dialog>
+										<label className="text-sm font-medium">Cliente (opcional)</label>
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => {
+												setOpen(false);
+												navigate("/clients", { state: { openModal: true } });
+											}}
+											className="h-7 text-xs">
+											<UserPlus className="w-3 h-3 mr-1" />
+											Novo Cliente
+										</Button>
 									</div>
-									<Select value={selectedClientId} onValueChange={setSelectedClientId}>
+									<Select value={customerId || "none"} onValueChange={setCustomerId}>
 										<SelectTrigger>
-											<SelectValue placeholder="Selecione um cliente (opcional)" />
+											<SelectValue placeholder="Selecione um cliente..." />
 										</SelectTrigger>
 										<SelectContent>
-											{clients.map((c) => (
+											<SelectItem value="none">Nenhum cliente</SelectItem>
+											{customers.map((c) => (
 												<SelectItem key={c.id} value={c.id}>
-													{c.name}
+													{c.name} {c.phone ? `(${c.phone})` : ''}
 												</SelectItem>
 											))}
 										</SelectContent>
 									</Select>
 								</div>
 								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Observaçǎo do pedido (opcional)</label>
+									<label className="text-sm font-medium">Observações do pedido (opcional)</label>
 									<textarea
 										className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 										placeholder="Adicione observações ou instruções especiais..."
-										value={description}
-										onChange={(e) => setDescription(e.target.value)}
+										value={notes}
+										onChange={(e) => setNotes(e.target.value)}
 									/>
 								</div>
 								<div className="flex items-center justify-between">
-									<p className="text-sm font-medium">Items</p>
+									<p className="text-sm font-medium">Produtos *</p>
 									<Button variant="outline" size="sm" onClick={addItem}>
 										<Plus className="w-3 h-3 mr-1" />
-										Adicionar prato
+										Adicionar produto
 									</Button>
 								</div>
 								<div className="space-y-2">
-									{items.length > 0 && (
-										<div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-2">
-											<span className="text-xs font-medium text-muted-foreground">Prato</span>
-											<span className="text-xs font-medium text-muted-foreground w-24">
-												Tamanho
-											</span>
+									{selectedProducts.length > 0 && (
+										<div className="grid grid-cols-[1fr_auto_auto] gap-2 px-2">
+											<span className="text-xs font-medium text-muted-foreground">Produto</span>
 											<span className="text-xs font-medium text-muted-foreground w-20">Qtd</span>
 											<span className="w-10"></span>
 										</div>
 									)}
-									{items.map((item, idx) => (
+									{selectedProducts.map((item, idx) => (
 										<div key={idx} className="flex items-center gap-2">
 											<Select
-												value={item.dishId}
-												onValueChange={(v) => updateItem(idx, "dishId", v)}>
+												value={item.productId}
+												onValueChange={(v) => updateItem(idx, "productId", v)}>
 												<SelectTrigger className="flex-1">
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent>
-													{dishes.map((d) => (
-														<SelectItem key={d.id} value={d.id}>
-															{d.name}
+													{products.map((p) => (
+														<SelectItem key={p.id} value={p.id}>
+															{p.name} {p.price ? `- $${Number(p.price).toFixed(2)}` : ''}
 														</SelectItem>
 													))}
-												</SelectContent>
-											</Select>
-											<Select value={item.size} onValueChange={(v) => updateItem(idx, "size", v)}>
-												<SelectTrigger className="w-24">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value="small">P</SelectItem>
-													<SelectItem value="medium">M</SelectItem>
-													<SelectItem value="large">G</SelectItem>
 												</SelectContent>
 											</Select>
 											<Input
@@ -376,56 +360,61 @@ export default function OrdersPage() {
 											</Button>
 										</div>
 									))}
-									{items.length === 0 && (
+									{selectedProducts.length === 0 && (
 										<div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center gap-2">
 											<AlertTriangle className="w-4 h-4 text-amber-600" />
 											<p className="text-sm text-amber-800">
-												Adicione pelo menos um prato ao pedido
+												Adicione pelo menos um produto ao pedido
 											</p>
 										</div>
 									)}
 								</div>
 
-								{feasibility && feasibility.shortages.length > 0 && (
-									<div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
-										<div className="flex items-center gap-2 text-destructive font-semibold text-sm">
-											<AlertTriangle className="w-4 h-4" /> Falta de Estoque
-										</div>
-										{feasibility.shortages.map((s, i) => (
-											<p key={i} className="text-xs text-destructive/80">
-												{s.product.name}: precisa {s.needed} {s.product.unit}, apenas{" "}
-												{s.available} disponível
-											</p>
-										))}
-									</div>
-								)}
-
-								{feasibility && feasibility.shortages.length === 0 && items.length > 0 && (
-									<div className="bg-success/10 border border-success/30 rounded-lg p-3 flex items-center gap-2 text-sm">
-										<CheckCircle2 className="w-4 h-4 text-success" />
-										<span className="text-success">Todos ingredientes diponiveis</span>
-									</div>
-								)}
-
-								{items.length > 0 && (
+								{selectedProducts.length > 0 && (
 									<div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
 										<span className="font-semibold text-slate-700 dark:text-slate-300">
-											Total do Pedido:
+											Total Estimado:
 										</span>
 										<span className="text-2xl font-bold text-primary">
-											${calculateOrderTotal(items).toFixed(2)}
+											${(() => {
+												const productsArray: string[] = [];
+												selectedProducts.forEach(item => {
+													for (let i = 0; i < item.quantity; i++) {
+														productsArray.push(item.productId);
+													}
+												});
+												return calculateOrderTotal(productsArray).toFixed(2);
+											})()}
 										</span>
 									</div>
 								)}
 
-								<Button className="w-full" onClick={handleSubmit} disabled={items.length === 0}>
-									{editingOrderId ? "Atualizar Pedido" : "Criar Pedido"}
+								<Button 
+									className="w-full" 
+									onClick={handleSubmit} 
+									disabled={selectedProducts.length === 0 || isLoading}>
+									{isLoading ? (
+										<>
+											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+											Criando...
+										</>
+									) : (
+										editingOrderId ? "Atualizar Pedido" : "Criar Pedido"
+									)}
 								</Button>
 							</div>
 						</DialogContent>
 					</Dialog>
 				</div>
 			</div>
+
+			{/* Error Alert */}
+			{error && (
+				<Alert variant="destructive">
+					<AlertCircle className="h-4 w-4" />
+					<AlertDescription>{error}</AlertDescription>
+				</Alert>
+			)}
 
 			{/* Filters Section */}
 			<Card>
@@ -448,7 +437,7 @@ export default function OrdersPage() {
 						)}
 					</div>
 					{filtersExpanded && (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
 							{/* Status Filter */}
 							<div className="space-y-1.5">
 								<label className="text-xs font-medium text-muted-foreground">Status</label>
@@ -458,35 +447,20 @@ export default function OrdersPage() {
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="all">Todos</SelectItem>
-										<SelectItem value="pending">Em andamento</SelectItem>
-										<SelectItem value="confirmed">Finalizado</SelectItem>
+										<SelectItem value="request">Pendente</SelectItem>
+										<SelectItem value="in_progress">Em Andamento</SelectItem>
+										<SelectItem value="finish">Finalizado</SelectItem>
+										<SelectItem value="refuse">Recusado</SelectItem>
+										<SelectItem value="canceled">Cancelado</SelectItem>
 									</SelectContent>
 								</Select>
 							</div>
 
-							{/* Client Filter */}
+							{/* Order ID Filter */}
 							<div className="space-y-1.5">
-								<label className="text-xs font-medium text-muted-foreground">Cliente</label>
-								<Select value={filterClient} onValueChange={setFilterClient}>
-									<SelectTrigger className="h-9">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="all">Todos</SelectItem>
-										{clients.map((c) => (
-											<SelectItem key={c.id} value={c.id}>
-												{c.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-							</div>
-
-							{/* Order Number Filter */}
-							<div className="space-y-1.5">
-								<label className="text-xs font-medium text-muted-foreground">Número do Pedido</label>
+								<label className="text-xs font-medium text-muted-foreground">ID do Pedido</label>
 								<Input
-									placeholder="Buscar por número..."
+									placeholder="Buscar por ID..."
 									value={filterOrderNumber}
 									onChange={(e) => setFilterOrderNumber(e.target.value)}
 									className="h-9"
@@ -522,7 +496,14 @@ export default function OrdersPage() {
 				</CardContent>
 			</Card>
 
-			{sortedOrders.length === 0 ? (
+			{isLoading && orders.length === 0 ? (
+				<Card>
+					<CardContent className="flex flex-col items-center justify-center py-12">
+						<Loader2 className="w-12 h-12 text-muted-foreground mb-4 animate-spin" />
+						<p className="text-muted-foreground">Carregando pedidos...</p>
+					</CardContent>
+				</Card>
+			) : sortedOrders.length === 0 ? (
 				<Card>
 					<CardContent className="flex flex-col items-center justify-center py-12">
 						<ClipboardList className="w-12 h-12 text-muted-foreground mb-4" />
@@ -535,137 +516,200 @@ export default function OrdersPage() {
 				</Card>
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					{sortedOrders.map((o) => (
-						<Card key={o.id} className="overflow-hidden flex flex-col">
-							<CardContent className="p-0 flex flex-col h-full">
-								{/* Header Section */}
-								<div className="flex items-center justify-between p-5 bg-gradient-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900 border-b-2 border-slate-300 dark:border-slate-700">
-									<div className="flex flex-col gap-1">
-										<span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-widest">
-											Pedido #{o.orderNumber}
-										</span>
-										<button
-											onClick={() => handleClientClick(o.clientId)}
-											disabled={!o.clientId}
-											className={`text-base font-bold text-left ${o.clientId ? "text-slate-900 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors underline decoration-transparent hover:decoration-current" : "text-slate-900 dark:text-slate-100 cursor-default"}`}>
-											{getClientName(o.clientId)}
-										</button>
-									</div>
-									<div className="flex items-center gap-4">
-										<span className="text-sm font-semibold text-slate-800 dark:text-slate-300">
-											{new Date(o.createdAt).toLocaleDateString("pt-BR", {
-												day: "2-digit",
-												month: "short",
-												year: "numeric",
-												hour: "2-digit",
-												minute: "2-digit",
-											})}
-										</span>
-										<Badge
-											variant={statusColor(o.status)}
-											className={`capitalize font-bold text-xs px-3 py-1 ${
-												o.status === "pending"
-													? "bg-yellow-100 text-yellow-900 border-yellow-400 hover:bg-yellow-100"
-													: "bg-green-100 text-green-900 border-green-400 hover:bg-green-100"
-											}`}>
-											{o.status === "pending" ? "Em andamento" : "Finalizado"}
-										</Badge>
-									</div>
-								</div>
+					{sortedOrders.map((o) => {
+						// Skip invalid orders
+						if (!o || !o.id) return null;
+						
+						// Group products by ID to show quantity
+						const productMap = new Map<string, { name: string; price: number; quantity: number }>();
+						
+						// Use products array if available, otherwise fall back to order_items
+						if (o.products && o.products.length > 0) {
+							o.products.forEach((productId) => {
+								const product = products.find(p => p.id === productId);
+								const productName = product?.name || getProductName(productId);
+								const productPrice = Number(product?.price || 0);
+								
+								if (productMap.has(productId)) {
+									const existing = productMap.get(productId)!;
+									existing.quantity += 1;
+								} else {
+									productMap.set(productId, {
+										name: productName,
+										price: productPrice,
+										quantity: 1
+									});
+								}
+							});
+						} else if (o.order_items && o.order_items.length > 0) {
+							// Fallback to order_items (showing consumed items/ingredients)
+							(o.order_items || []).forEach((orderItem) => {
+								const itemId = orderItem.item_id;
+								const itemName = orderItem.item?.name || "Item";
+								
+								if (productMap.has(itemId)) {
+									const existing = productMap.get(itemId)!;
+									existing.quantity += orderItem.quantity;
+								} else {
+									productMap.set(itemId, {
+										name: itemName,
+										price: 0, // Items don't have prices
+										quantity: orderItem.quantity
+									});
+								}
+							});
+						}
 
-								{/* Description Section */}
-								{o.description && (
-									<div className="px-5 py-3 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-900">
-										<p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1 uppercase tracking-wide">
-											Descrição
-										</p>
-										<p className="text-sm text-blue-900 dark:text-blue-200">{o.description}</p>
+						return (
+							<Card key={o.id} className="overflow-hidden flex flex-col">
+								<CardContent className="p-0 flex flex-col h-full">
+									{/* Header Section */}
+									<div className="flex items-center justify-between p-5 bg-gradient-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900 border-b-2 border-slate-300 dark:border-slate-700">
+										<div className="flex flex-col gap-1">
+											<span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-widest">
+												Pedido #{o.id.slice(0, 8)}
+											</span>
+											<span className="text-base font-bold text-slate-900 dark:text-slate-100">
+												{getCustomerName(o.customerId)}
+											</span>
+										</div>
+										<div className="flex items-center gap-4">
+											<span className="text-sm font-semibold text-slate-800 dark:text-slate-300">
+												{new Date(o.created_at).toLocaleDateString("pt-BR", {
+													day: "2-digit",
+													month: "short",
+													year: "numeric",
+													hour: "2-digit",
+													minute: "2-digit",
+												})}
+											</span>
+											<Badge
+												variant={statusColor(o.status)}
+												className={`capitalize font-bold text-xs px-3 py-1 ${
+													o.status === "request"
+														? "bg-yellow-100 text-yellow-900 border-yellow-400 hover:bg-yellow-100"
+														: o.status === "in_progress"
+															? "bg-blue-100 text-blue-900 border-blue-400 hover:bg-blue-100"
+															: o.status === "finish"
+																? "bg-green-100 text-green-900 border-green-400 hover:bg-green-100"
+																: "bg-red-100 text-red-900 border-red-400 hover:bg-red-100"
+												}`}>
+												{statusLabel(o.status)}
+											</Badge>
+										</div>
 									</div>
-								)}
 
-								{/* Items Section */}
-								<div className="p-4 flex-1">
-									<p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-										Itens ({o.items.length})
-									</p>
-									<div className="space-y-2">
-										{o.items.map((item, i) => {
-											const dish = dishes.find((d) => d.id === item.dishId);
-											const price = dish
-												? item.size === "small"
-													? dish.priceSmall
-													: item.size === "medium"
-														? dish.priceMedium
-														: dish.priceLarge
-												: 0;
-											return (
-												<div
-													key={i}
-													className="flex items-center justify-between py-2 px-3 bg-secondary/50 rounded-md">
-													<div className="flex flex-col">
-														<span className="text-sm font-medium">
-															{getDishName(item.dishId)}
-														</span>
-														<span className="text-xs text-muted-foreground">
-															{item.size === "small"
-																? "Pequeno"
-																: item.size === "medium"
-																	? "Médio"
-																	: "Grande"}{" "}
-															- ${price.toFixed(2)}
-														</span>
-													</div>
-													<span className="text-sm text-muted-foreground">
-														× {item.quantity}
-													</span>
-												</div>
-											);
-										})}
-									</div>
-									<div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-										<span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-											Total:
-										</span>
-										<span className="text-lg font-bold text-primary">
-											${calculateOrderTotal(o.items).toFixed(2)}
-										</span>
-									</div>
-								</div>
-
-								{/* Actions Section */}
-								<div className="flex items-center justify-end gap-2 p-4 pt-0">
-									{o.status === "pending" && (
-										<>
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => startEditOrder(o)}
-												className="bg-blue-50 border-blue-600 text-blue-700 hover:bg-blue-100 hover:border-blue-700 hover:text-blue-800">
-												<Edit className="w-3 h-3 mr-1" />
-												Editar
-											</Button>
-											<Button
-												size="sm"
-												variant="outline"
-												onClick={() => confirmOrder(o.id)}
-												className="bg-green-50 border-green-600 text-green-700 hover:bg-green-100 hover:border-green-700 hover:text-green-800">
-												<CheckCircle2 className="w-3 h-3 mr-1" />
-												Confirmar
-											</Button>
-										</>
+									{/* Notes Section */}
+									{o.notes && (
+										<div className="px-5 py-3 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-900">
+											<p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1 uppercase tracking-wide">
+												Observações
+											</p>
+											<p className="text-sm text-blue-900 dark:text-blue-200">{o.notes}</p>
+										</div>
 									)}
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={() => deleteOrder(o.id)}
-										className="bg-red-50 border-red-600 text-red-700 hover:bg-red-100 hover:border-red-700 hover:text-red-800">
-										<Trash2 className="w-3 h-3 mr-1" />
-										Excluir
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					))}
+
+									{/* Products Section */}
+									<div className="p-4 flex-1">
+										<p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+											Produtos ({productMap.size})
+										</p>
+										<div className="space-y-2.5">
+											{Array.from(productMap.entries()).map(([productId, product]) => (
+												<div
+													key={productId}
+													className="flex items-center justify-between py-2.5 px-3 bg-gradient-to-r from-secondary/40 to-secondary/20 rounded-lg border border-secondary/50 hover:border-secondary transition-colors">
+													<div className="flex items-center gap-3 flex-1">
+														<div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
+															{product.quantity}
+														</div>
+														<div className="flex flex-col">
+															<span className="text-sm font-semibold text-foreground">
+																{product.name}
+															</span>
+															{product.price > 0 && (
+																<span className="text-xs text-muted-foreground">
+																	${product.price.toFixed(2)} × {product.quantity} = ${(product.price * product.quantity).toFixed(2)}
+																</span>
+															)}
+														</div>
+													</div>
+												</div>
+											))}
+										</div>
+										<div className="mt-4 pt-3 border-t-2 border-slate-200 dark:border-slate-700 flex items-center justify-between">
+											<span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+												Total:
+											</span>
+											<span className="text-xl font-bold text-primary">
+												${Array.from(productMap.values()).reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2)}
+											</span>
+										</div>
+									</div>
+
+									{/* Actions Section */}
+									<div className="flex items-center justify-end gap-2 p-4 pt-0">
+										{o.status === "request" && (
+											<>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={async () => {
+														try {
+															await updateOrderStatus(o.id, 'in_progress');
+															await fetchOrders();
+															toast.success('Pedido iniciado!');
+														} catch (error: any) {
+															toast.error(error.message || 'Falha ao atualizar pedido');
+														}
+													}}
+													className="bg-blue-50 border-blue-600 text-blue-700 hover:bg-blue-100 hover:border-blue-700 hover:text-blue-800">
+													<CheckCircle2 className="w-3 h-3 mr-1" />
+													Iniciar
+												</Button>
+											</>
+										)}
+										{o.status === "in_progress" && (
+											<>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={async () => {
+														try {
+															await updateOrderStatus(o.id, 'finish');
+															await fetchOrders();
+															toast.success('Pedido finalizado!');
+														} catch (error: any) {
+															toast.error(error.message || 'Falha ao finalizar pedido');
+														}
+													}}
+													className="bg-green-50 border-green-600 text-green-700 hover:bg-green-100 hover:border-green-700 hover:text-green-800">
+													<CheckCircle2 className="w-3 h-3 mr-1" />
+													Finalizar
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={async () => {
+														try {
+															await updateOrderStatus(o.id, 'canceled');
+															await fetchOrders();
+															toast.success('Pedido cancelado!');
+														} catch (error: any) {
+															toast.error(error.message || 'Falha ao cancelar pedido');
+														}
+													}}
+													className="bg-orange-50 border-orange-600 text-orange-700 hover:bg-orange-100 hover:border-orange-700 hover:text-orange-800">
+													<X className="w-3 h-3 mr-1" />
+													Cancelar
+												</Button>
+											</>
+										)}
+									</div>
+								</CardContent>
+							</Card>
+						);
+					})}
 				</div>
 			)}
 		</div>
