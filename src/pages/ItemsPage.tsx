@@ -23,8 +23,8 @@ import {
 	AlertCircle,
 	Box
 } from "lucide-react";
-import { toast } from "sonner";
 import type { UnitType } from "@/types/api";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 
 // Helper function to get unit display information
 const getUnitDisplay = (unitType: UnitType) => {
@@ -107,13 +107,13 @@ export default function ItemsPage() {
 
 	const handleSubmit = async () => {
 		if (!form.name.trim() || !form.unit_type) {
-			toast.error('Por favor, preencha os campos obrigatórios');
+			showErrorToast('Por favor, preencha os campos obrigatórios');
 			return;
 		}
 
 		// Validate quantity if creating new item
 		if (!editId && !form.quantity) {
-			toast.error('Por favor, informe a quantidade inicial');
+			showErrorToast('Por favor, informe a quantidade inicial');
 			return;
 		}
 
@@ -121,12 +121,12 @@ export default function ItemsPage() {
 		const alertQty = form.alert_quantity ? parseFloat(form.alert_quantity) : null;
 
 		if (!editId && (quantity === null || isNaN(quantity) || quantity < 0.01)) {
-			toast.error('Quantidade deve ser maior que 0');
+			showErrorToast('Quantidade deve ser maior que 0');
 			return;
 		}
 
 		if (alertQty !== null && (isNaN(alertQty) || alertQty < 0)) {
-			toast.error('Quantidade de alerta inválida');
+			showErrorToast('Quantidade de alerta inválida');
 			return;
 		}
 
@@ -139,7 +139,7 @@ export default function ItemsPage() {
 
 			if (editId) {
 				await updateItem(editId, itemData);
-				toast.success('Item atualizado com sucesso!');
+				showSuccessToast('Ingrediente atualizado com sucesso!');
 			} else {
 				const newItem = await createItem(itemData);
 				
@@ -155,7 +155,7 @@ export default function ItemsPage() {
 					});
 				}
 				
-				toast.success('Item e estoque criados com sucesso!');
+				showSuccessToast('Ingrediente criado com sucesso!');
 			}
 			
 			resetForm();
@@ -163,7 +163,7 @@ export default function ItemsPage() {
 			await Promise.all([fetchItems(), fetchStock()]);
 		} catch (err: any) {
 			console.error('Failed to save item:', err);
-			toast.error(err.message || 'Erro ao salvar item');
+			showErrorToast(err.message || 'Erro ao salvar item');
 		}
 	};
 
@@ -181,15 +181,15 @@ export default function ItemsPage() {
 	};
 
 	const handleDelete = async (id: string) => {
-		if (!confirm('Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.')) return;
+		if (!confirm('Tem certeza que deseja excluir este ingrediente? Esta ação não pode ser desfeita.')) return;
 
 		try {
 			await deleteItem(id);
-			toast.success('Item excluído com sucesso!');
+			showSuccessToast('Ingrediente excluído com sucesso!');
 			await fetchItems();
 		} catch (err: any) {
 			console.error('Failed to delete item:', err);
-			toast.error(err.message || 'Erro ao excluir item');
+			showErrorToast(err.message || 'Erro ao excluir item');
 		}
 	};
 
@@ -270,73 +270,99 @@ export default function ItemsPage() {
 										disabled={isLoading}
 									/>
 								</div>
-								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Tipo de Unidade *</label>
-									<Select 
-										value={form.unit_type} 
-										onValueChange={(v: UnitType) => setForm({ ...form, unit_type: v })}
-										disabled={isLoading || !!editId}
-									>
-										<SelectTrigger>
-											<SelectValue placeholder="Selecione o tipo de unidade" />
-										</SelectTrigger>
-										<SelectContent>
-									<SelectItem value="grams">Gramas (g)</SelectItem>
-									<SelectItem value="kg">Quilogramas (kg)</SelectItem>
-									<SelectItem value="ml">Mililitros (ml)</SelectItem>
-									<SelectItem value="liters">Litros (L)</SelectItem>
-									<SelectItem value="unit">Unidade (un)</SelectItem>
-										</SelectContent>
-									</Select>
-									{editId && (
-										<p className="text-xs text-amber-600 dark:text-amber-500">
-											⚠️ O tipo de unidade não pode ser alterado após a criação
-										</p>
-									)}
-								</div>
 
 						{!editId && (
-					<div className="grid grid-cols-3 gap-4">
-					<div className="space-y-1.5">
-						<label className="text-sm font-medium">Estoque Inicial *</label>
-						<Input
-							type="number"
-							placeholder="Ex: 100"
-							value={form.quantity}
-							onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-							disabled={isLoading}
-							min="0.01"
-							step="0.01"
-						/>
-					</div>
-					<div className="space-y-1.5">
-						<label className="text-sm font-medium">Preço de Compra *</label>
-						<Input
-							type="number"
-							placeholder="Ex: 25.50"
-							value={form.purchase_price}
-							onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
-							disabled={isLoading}
-							min="0"
-							/>
-						</div>
-						<div className="space-y-1.5">
-							<label className="text-sm font-medium">Alerta de estoque mínimo</label>
-							<Input
-								type="number"
-								placeholder="Ex: 10"
-								value={form.alert_quantity}
-								onChange={(e) => setForm({ ...form, alert_quantity: e.target.value })}
-								disabled={isLoading}
-								min="0"
-								step="0.01"
-							/>
-							<p className="text-xs text-muted-foreground">
-								Será alertado quando o estoque atingir este nível
-							</p>
-						</div>
-					</div>
-				)}
+							<>
+								<div className="grid grid-cols-2 gap-4">
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Estoque Inicial *</label>
+										<Input
+											type="number"
+											placeholder="Ex: 100"
+											value={form.quantity}
+											onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+											disabled={isLoading}
+											min="0.01"
+											step="0.01"
+										/>
+									</div>
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Tipo de Unidade *</label>
+										<Select 
+											value={form.unit_type} 
+											onValueChange={(v: UnitType) => setForm({ ...form, unit_type: v })}
+											disabled={isLoading}
+										>
+											<SelectTrigger>
+												<SelectValue placeholder="Selecione a unidade" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="grams">Gramas (g)</SelectItem>
+												<SelectItem value="kg">Quilogramas (kg)</SelectItem>
+												<SelectItem value="ml">Mililitros (ml)</SelectItem>
+												<SelectItem value="liters">Litros (L)</SelectItem>
+												<SelectItem value="unit">Unidade (un)</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+								</div>
+
+								<div className="grid grid-cols-2 gap-4">
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Preço de Compra *</label>
+										<Input
+											type="number"
+											placeholder="Ex: 25.50"
+											value={form.purchase_price}
+											onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+											disabled={isLoading}
+											min="0"
+											step="0.01"
+										/>
+									</div>
+									<div className="space-y-1.5">
+										<label className="text-sm font-medium">Alerta de Estoque Mínimo *</label>
+										<Input
+											type="number"
+											placeholder="Ex: 10"
+											value={form.alert_quantity}
+											onChange={(e) => setForm({ ...form, alert_quantity: e.target.value })}
+											disabled={isLoading}
+											min="0"
+											step="0.01"
+										/>
+									</div>
+								</div>
+								<p className="text-xs text-muted-foreground -mt-2">
+									Voce será alertado quando o estoque atingir o nível mínimo configurado!
+								</p>
+							</>
+						)}
+
+						{editId && (
+							<div className="space-y-1.5">
+								<label className="text-sm font-medium">Tipo de Unidade</label>
+								<Select 
+									value={form.unit_type} 
+									onValueChange={(v: UnitType) => setForm({ ...form, unit_type: v })}
+									disabled={true}
+								>
+									<SelectTrigger>
+										<SelectValue placeholder="Selecione o tipo de unidade" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="grams">Gramas (g)</SelectItem>
+										<SelectItem value="kg">Quilogramas (kg)</SelectItem>
+										<SelectItem value="ml">Mililitros (ml)</SelectItem>
+										<SelectItem value="liters">Litros (L)</SelectItem>
+										<SelectItem value="unit">Unidade (un)</SelectItem>
+									</SelectContent>
+								</Select>
+								<p className="text-xs text-amber-600 dark:text-amber-500">
+									⚠️ O tipo de unidade não pode ser alterado após a criação
+								</p>
+							</div>
+						)}
 				
 				<Button 
 							className="w-full" 
@@ -369,7 +395,7 @@ export default function ItemsPage() {
 							<Button
 								variant="ghost"
 								onClick={() => setFiltersExpanded(!filtersExpanded)}
-								className="flex items-center gap-2 hover:bg-muted"
+								className="flex items-center gap-2"
 							>
 								<Filter className="w-4 h-4" />
 								<span className="font-medium">Filtros</span>
