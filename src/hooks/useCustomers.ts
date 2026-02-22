@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { customersAPI } from "@/lib/apiService";
 import type { BackendCustomer, CreateCustomerDto, UpdateCustomerDto } from "@/types/backend";
-import { toast } from "sonner";
 
 /**
  * Hook for managing customers with API integration
@@ -22,7 +21,6 @@ export function useCustomers() {
 		} catch (err: any) {
 			const errorMessage = err.message || "Erro ao carregar clientes";
 			setError(errorMessage);
-			toast.error(errorMessage);
 			console.error("Error fetching customers:", err);
 		} finally {
 			setLoading(false);
@@ -35,13 +33,10 @@ export function useCustomers() {
 			try {
 				const newCustomer = await customersAPI.create(data);
 				setCustomers((prev) => [...prev, newCustomer]);
-				toast.success("Cliente criado com sucesso!");
 				return newCustomer;
 			} catch (err: any) {
-				const errorMessage = err.message || "Erro ao criar cliente";
-				toast.error(errorMessage);
 				console.error("Error creating customer:", err);
-				return null;
+				throw err;
 			}
 		},
 		[]
@@ -53,13 +48,10 @@ export function useCustomers() {
 			try {
 				const updatedCustomer = await customersAPI.update(id, data);
 				setCustomers((prev) => prev.map((c) => (c.id === id ? updatedCustomer : c)));
-				toast.success("Cliente atualizado com sucesso!");
 				return true;
 			} catch (err: any) {
-				const errorMessage = err.message || "Erro ao atualizar cliente";
-				toast.error(errorMessage);
 				console.error("Error updating customer:", err);
-				return false;
+				throw err;
 			}
 		},
 		[]
@@ -70,13 +62,10 @@ export function useCustomers() {
 		try {
 			await customersAPI.delete(id);
 			setCustomers((prev) => prev.filter((c) => c.id !== id));
-			toast.success("Cliente removido com sucesso!");
 			return true;
 		} catch (err: any) {
-			const errorMessage = err.message || "Erro ao remover cliente";
-			toast.error(errorMessage);
 			console.error("Error deleting customer:", err);
-			return false;
+			throw err;
 		}
 	}, []);
 

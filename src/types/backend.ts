@@ -32,6 +32,12 @@ export interface BackendCustomer {
 	phone?: string | null;
 	email?: string | null;
 	address?: string | null;
+	created_at: string; // ISO date string
+	updated_at: string; // ISO date string
+	orders?: any[]; // Array of order objects
+	order_count?: number;
+	order_in_progress_count?: number;
+	order_finish_count?: number;
 }
 
 export interface CreateCustomerDto {
