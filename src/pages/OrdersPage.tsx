@@ -22,6 +22,7 @@ import {
 	Loader2,
 	AlertCircle,
 	Printer,
+	ChevronRight,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -479,26 +480,44 @@ export default function OrdersPage() {
 
 			{/* Filters Section */}
 			<Card>
-				<CardContent className="pt-6">
-					<div className="flex items-center gap-2 mb-4">
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setFiltersExpanded(!filtersExpanded)}
-							className="h-8 px-2 -ml-2">
-							{filtersExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-						</Button>
-						<Filter className="w-4 h-4 text-muted-foreground" />
-						<h3 className="font-semibold text-sm">Filtros</h3>
-						{hasActiveFilters && (
-							<Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto h-7 text-xs">
-								<XCircle className="w-3 h-3 mr-1" />
-								Limpar filtros
+				<CardContent className="p-4">
+					<div className="space-y-4">
+						{/* Filter Header */}
+						<div className="flex items-center justify-between">
+							<Button
+								variant="ghost"
+								onClick={() => setFiltersExpanded(!filtersExpanded)}
+								className="flex items-center gap-2"
+							>
+								<Filter className="w-4 h-4" />
+								<span className="font-medium">Filtros</span>
+								{hasActiveFilters && (
+									<Badge variant="secondary" className="ml-2">
+										{[filterStatus !== "all", filterOrderNumber !== "", filterDateFrom !== "", filterDateTo !== ""].filter(Boolean).length}
+									</Badge>
+								)}
+								{filtersExpanded ? (
+									<ChevronDown className="w-4 h-4 ml-1" />
+								) : (
+									<ChevronRight className="w-4 h-4 ml-1" />
+								)}
 							</Button>
-						)}
-					</div>
-					{filtersExpanded && (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+							{hasActiveFilters && (
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={clearFilters}
+									className="text-muted-foreground hover:text-foreground"
+								>
+									<XCircle className="w-4 h-4 mr-2" />
+									Limpar Filtros
+								</Button>
+							)}
+						</div>
+
+						{/* Filter Controls */}
+						{filtersExpanded && (
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t">
 							{/* Status Filter */}
 							<div className="space-y-1.5">
 								<label className="text-xs font-medium text-muted-foreground">Status</label>
@@ -550,9 +569,13 @@ export default function OrdersPage() {
 								/>
 							</div>
 						</div>
-					)}
-					<div className="mt-3 text-xs text-muted-foreground">
-						Mostrando {sortedOrders.length} de {orders.length} pedidos
+						)}
+
+						{/* Results Count */}
+						<div className="text-sm text-muted-foreground">
+							Mostrando <span className="font-semibold text-foreground">{sortedOrders.length}</span> de{" "}
+							<span className="font-semibold text-foreground">{orders.length}</span> pedidos
+						</div>
 					</div>
 				</CardContent>
 			</Card>
