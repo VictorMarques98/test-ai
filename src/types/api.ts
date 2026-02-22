@@ -73,8 +73,9 @@ export interface CreateStockDto {
 }
 
 export interface UpdateStockDto {
-  quantity: number; // Replaces current stock quantity
-  alert_quantity?: number | null;
+  operation: "add" | "remove"; // Operation type
+  quantity: number; // Amount to add or remove (always positive)
+  alert_quantity?: number | null; // Optional: update alert threshold
 }
 
 export interface Stock {

@@ -17,6 +17,7 @@ import {
 	ProductWithItems,
 	OrderWithItems,
 } from "@/types/restaurant";
+import type { StockHistoryEntry } from "@/types/backend";
 import itemsService from "@/services/itemsService";
 import productsService from "@/services/productsService";
 import stockService from "@/services/stockService";
@@ -27,6 +28,7 @@ interface RestaurantStore {
 	items: Item[];
 	products: Product[];
 	stock: Stock[];
+	stockHistory: StockHistoryEntry[];
 	orders: Order[];
 	clients: Client[];
 	isLoading: boolean;
@@ -46,6 +48,7 @@ interface RestaurantStore {
 
 	// Stock actions
 	fetchStock: () => Promise<void>;
+	fetchStockHistory: () => Promise<void>;
 	createStock: (data: CreateStockDto) => Promise<Stock>;
 	updateStock: (id: string, data: UpdateStockDto) => Promise<void>;
 	getStockByItemId: (itemId: string) => Promise<Stock | null>;
@@ -75,6 +78,7 @@ export const useRestaurantStore = create<RestaurantStore>((set, get) => ({
 	items: [],
 	products: [],
 	stock: [],
+	stockHistory: [],
 	orders: [],
 	clients: [],
 	isLoading: false,
@@ -225,9 +229,21 @@ export const useRestaurantStore = create<RestaurantStore>((set, get) => ({
 				stock: state.stock.map((s) => s.id === id ? updatedStock : s),
 				isLoading: false,
 			}));
+			// Fetch updated history after stock update
+			await get().fetchStockHistory();
 		} catch (error: any) {
 			set({ error: error.message || 'Failed to update stock', isLoading: false });
 			throw error;
+		}
+	},
+
+	fetchStockHistory: async () => {
+		try {
+			const history = await stockService.getHistory();
+			set({ stockHistory: history });
+		} catch (error: any) {
+			console.error('Failed to fetch stock history:', error);
+			// Don't throw error for history, just log it
 		}
 	},
 

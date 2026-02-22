@@ -161,7 +161,7 @@ export default function DishesPage() {
 						</div>
 						<div>
 							<h1 className="text-3xl font-bold text-white">Cardapio</h1>
-							<p className="text-slate-300 mt-1">Visualize todas suas receitas</p>
+							<p className="text-slate-300 mt-1">Visualize todos seus pratos.</p>
 						</div>
 					</div>
 					<Dialog
@@ -380,7 +380,7 @@ export default function DishesPage() {
 														{pi.item?.name || getItemName(pi.item_id)}
 													</div>
 													<div className="text-muted-foreground">
-														{pi.quantity} {getItemUnit(pi.item_id)}
+														{Number(pi.quantity).toFixed(2)} {getItemUnit(pi.item_id)}
 													</div>
 												</div>
 											))

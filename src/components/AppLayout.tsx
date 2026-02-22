@@ -6,13 +6,16 @@ import {
   ClipboardList,
   Users,
   BarChart3,
+  Box,
+  PackageOpen,
 } from "lucide-react";
 import LowStockBanner from "./LowStockBanner";
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/inventory", label: "Estoque", icon: Package },
-  { to: "/dishes", label: "Cardapio", icon: UtensilsCrossed },
+  { to: "/items", label: "Ingredientes", icon: Box },
+  { to: "/stock", label: "Estoque", icon: PackageOpen },
+  { to: "/dishes", label: "Cardápio", icon: UtensilsCrossed },
   { to: "/orders", label: "Pedidos", icon: ClipboardList },
   { to: "/clients", label: "Clientes", icon: Users },
   { to: "/reports", label: "Relatórios", icon: BarChart3, disabled: true },
@@ -22,9 +25,9 @@ export default function AppLayout() {
   return (
     <div className="flex min-h-screen">
       <aside className="w-64 bg-card border-r border-border p-6 hidden md:flex flex-col">
-        <h2 className="text-xl font-bold text-primary mb-8 tracking-wide">
-          🍽️ Thaina Pty
-        </h2>
+        <div className="mb-6">
+          <img src="/logo.png" alt="Thaina Pty" className="w-full h-auto max-w-36" />
+        </div>
         <nav className="space-y-1 flex-1">
           {links.map((l) => (
             <NavLink

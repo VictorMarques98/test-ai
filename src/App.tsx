@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import DashboardPage from "@/pages/DashboardPage";
+import ItemsPage from "@/pages/ItemsPage";
+import StockPage from "@/pages/StockPage";
 import InventoryPage from "@/pages/InventoryPage";
 import DishesPage from "@/pages/DishesPage";
 import OrdersPage from "@/pages/OrdersPage";
@@ -23,6 +25,8 @@ const App = () => (
 				<Routes>
 					<Route element={<AppLayout />}>
 						<Route path="/" element={<DashboardPage />} />
+						<Route path="/items" element={<ItemsPage />} />
+						<Route path="/stock" element={<StockPage />} />
 						<Route path="/inventory" element={<InventoryPage />} />
 						<Route path="/dishes" element={<DishesPage />} />
 						<Route path="/orders" element={<OrdersPage />} />
