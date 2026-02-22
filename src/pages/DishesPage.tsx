@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Pencil, UtensilsCrossed, X, AlertCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductItemDto } from "@/types/api";
-import { toast } from "sonner";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 
 export default function DishesPage() {
 	const location = useLocation();
@@ -75,7 +76,7 @@ export default function DishesPage() {
 
 	const handleSubmit = async () => {
 		if (!name.trim() || productItems.length === 0) {
-			toast.error('Por favor, preencha o nome e adicione pelo menos um ingrediente');
+			showErrorToast('Por favor, preencha o nome e adicione pelo menos um ingrediente');
 			return;
 		}
 
@@ -91,15 +92,15 @@ export default function DishesPage() {
 
 			if (editId) {
 				await updateProduct(editId, data);
-				toast.success('Prato atualizado com sucesso!');
+				showSuccessToast('Prato atualizado com sucesso!');
 			} else {
 				await createProduct(data);
-				toast.success('Prato criado com sucesso!');
+				showSuccessToast('Prato criado com sucesso!');
 			}
 			resetForm();
 			setOpen(false);
 		} catch (error: any) {
-			toast.error(error.message || 'Falha ao salvar prato');
+			showErrorToast(error.message || 'Falha ao salvar prato');
 		}
 	};
 
@@ -107,14 +108,14 @@ export default function DishesPage() {
 		setEditId(product.id);
 		setName(product.name);
 		setDescription(product.description || "");
-		setPrice(product.price ? String(product.price) : "");
-		setBuyPrice(product.buyPrice ? String(product.buyPrice) : "");
+		setPrice(product.price ? Number(product.price).toFixed(2) : "");
+		setBuyPrice(product.buyPrice ? Number(product.buyPrice).toFixed(2) : "");
 		setIsAdditional(product.is_additional || false);
 		
 		// Map product_items to ProductItemDto format
 		const mappedItems: ProductItemDto[] = (product.product_items || []).map(pi => ({
 			itemId: pi.item_id,
-			quantity: pi.quantity
+			quantity: Number(pi.quantity)
 		}));
 		setProductItems(mappedItems);
 		setOpen(true);
@@ -210,7 +211,7 @@ export default function DishesPage() {
 										className="h-4 w-4 rounded border-gray-300"
 									/>
 									<label htmlFor="is_additional" className="text-sm font-medium cursor-pointer">
-										É um adicional (ex: extra)
+										Adicional
 									</label>
 								</div>
 								<div className="grid grid-cols-2 gap-3">
@@ -263,9 +264,9 @@ export default function DishesPage() {
 												<div className="flex items-center gap-1 min-w-[120px]">
 													<Input
 														type="number"
-														step="0.1"
+														step="0.01"
 														className="text-sm w-20"
-														value={item.quantity}
+														value={Number(item.quantity).toFixed(2)}
 														onChange={(e) => updateIngredient(idx, "quantity", e.target.value)}
 													/>
 													<span className="text-xs text-muted-foreground min-w-[30px]">
@@ -341,7 +342,7 @@ export default function DishesPage() {
 											<div className="flex gap-3 mt-2 text-sm">
 												{product.price && (
 													<span className="text-muted-foreground">
-														Venda:{" "}
+														Preço Venda:{" "}
 														<span className="font-bold text-primary">
 															${Number(product.price).toFixed(2)}
 														</span>
@@ -349,7 +350,7 @@ export default function DishesPage() {
 												)}
 												{product.buyPrice && (
 													<span className="text-muted-foreground">
-														Custo:{" "}
+														Preço Custo:{" "}
 														<span className="font-semibold text-foreground">
 															${Number(product.buyPrice).toFixed(2)}
 														</span>
@@ -357,10 +358,16 @@ export default function DishesPage() {
 												)}
 											</div>
 										</div>
-										<div className="flex gap-1 ml-2">
-											<Button variant="ghost" size="icon" onClick={() => startEdit(product)}>
-												<Pencil className="w-4 h-4" />
-											</Button>
+										<div className="flex flex-col items-end gap-2 ml-2">
+											{product.is_additional && (
+												<Badge variant="secondary" className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30">
+													Adicional
+												</Badge>
+											)}
+											<div className="flex gap-1">
+												<Button variant="ghost" size="icon" onClick={() => startEdit(product)}>
+													<Pencil className="w-4 h-4" />
+												</Button>
 											<Button
 												variant="ghost"
 												size="icon"
@@ -368,16 +375,15 @@ export default function DishesPage() {
 													if (confirm('Tem certeza que deseja excluir este prato?')) {
 														try {
 															await deleteProduct(product.id);
-															toast.success('Prato excluído com sucesso!');
+															showSuccessToast('Prato excluído com sucesso!');
 														} catch (error: any) {
-															toast.error(error.message || 'Falha ao excluir prato');
+															showErrorToast(error.message || 'Falha ao excluir prato');
 														}
 													}
 												}}
 												className="hover:bg-destructive/10 hover:text-destructive">
 												<Trash2 className="w-4 h-4" />
-											</Button>
-										</div>
+											</Button>											</div>										</div>
 									</div>
 								</div>
 								<div className="p-4 flex-1 overflow-auto">
