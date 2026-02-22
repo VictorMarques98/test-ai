@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useReactToPrint } from "react-to-print";
 import { useRestaurantStore } from "@/store/restaurantStoreApi";
 import { useCustomers } from "@/hooks/useCustomers";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
 	UserPlus,
 	Loader2,
 	AlertCircle,
+	Printer,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +29,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { OrderLabelsTemplate } from "@/components/OrderLabelsTemplate";
+import type { Order } from "@/types/api";
 
 export default function OrdersPage() {
 	const location = useLocation();
@@ -57,6 +61,39 @@ export default function OrdersPage() {
 	const [filterOrderNumber, setFilterOrderNumber] = useState<string>("");
 	const [filterDateFrom, setFilterDateFrom] = useState<string>("");
 	const [filterDateTo, setFilterDateTo] = useState<string>("");
+
+	// Print states
+	const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
+	const printRef = useRef<HTMLDivElement>(null);
+
+	// Print handler
+	const handlePrint = useReactToPrint({
+		contentRef: printRef,
+		documentTitle: `Pedido-${orderToPrint?.id.substring(0, 8).toUpperCase()}`,
+		onAfterPrint: () => {
+			// Only finish the order after printing is complete
+			if (orderToPrint) {
+				updateOrderStatus(orderToPrint.id, 'finish')
+					.then(() => {
+						fetchOrders();
+						toast.success('Pedido finalizado!');
+					})
+					.catch((error: any) => {
+						toast.error(error.message || 'Falha ao finalizar pedido');
+					})
+					.finally(() => {
+						setOrderToPrint(null);
+					});
+			}
+		},
+	});
+
+	// Trigger print when orderToPrint is set
+	useEffect(() => {
+		if (orderToPrint && printRef.current) {
+			handlePrint();
+		}
+	}, [orderToPrint, handlePrint]);
 
 	// Fetch data on mount
 	useEffect(() => {
@@ -701,18 +738,13 @@ export default function OrdersPage() {
 												<Button
 													size="sm"
 													variant="outline"
-													onClick={async () => {
-														try {
-															await updateOrderStatus(o.id, 'finish');
-															await fetchOrders();
-															toast.success('Pedido finalizado!');
-														} catch (error: any) {
-															toast.error(error.message || 'Falha ao finalizar pedido');
-														}
-													}}
-													className="bg-green-50 border-green-600 text-green-700 hover:bg-green-100 hover:border-green-700 hover:text-green-800">
-													<CheckCircle2 className="w-3 h-3 mr-1" />
-													Finalizar
+												onClick={() => {
+													// Set order to print, which will trigger the print dialog
+													setOrderToPrint(o);
+												}}
+												className="bg-green-50 border-green-600 text-green-700 hover:bg-green-100 hover:border-green-700 hover:text-green-800">
+												<Printer className="w-3 h-3 mr-1" />
+												Finalizar e Imprimir
 												</Button>
 												<Button
 													size="sm"
@@ -739,6 +771,17 @@ export default function OrdersPage() {
 					})}
 				</div>
 			)}
+
+		{/* Hidden printable component */}
+		<div>
+			{orderToPrint && (
+				<OrderLabelsTemplate
+					ref={printRef}
+					order={orderToPrint}
+					customerName={getCustomerName(orderToPrint)}
+				/>
+			)}
 		</div>
+	</div>
 	);
 }

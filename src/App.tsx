@@ -33,6 +33,7 @@ const App = () => (
 						<Route path="/clients" element={<ClientsPage />} />{" "}
 						<Route path="/reports" element={<ReportsPage />} />{" "}
 					</Route>
+
 					<Route path="*" element={<NotFound />} />
 				</Routes>
 			</HashRouter>
