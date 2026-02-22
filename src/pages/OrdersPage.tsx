@@ -164,7 +164,13 @@ export default function OrdersPage() {
 		}, 0);
 	};
 
-	const getCustomerName = (customerId?: string | null) => {
+	const getCustomerName = (order: any) => {
+		// First check if customer data is embedded in the order
+		if (order.customer && order.customer.name) {
+			return order.customer.name;
+		}
+		// Otherwise try to find customer by ID
+		const customerId = order.customer_id || order.customerId;
 		if (!customerId) return "Cliente não informado";
 		const customer = customers.find((c) => c.id === customerId);
 		return customer?.name || "Cliente não encontrado";
@@ -570,7 +576,7 @@ export default function OrdersPage() {
 												Pedido #{o.id.slice(0, 8)}
 											</span>
 											<span className="text-base font-bold text-slate-900 dark:text-slate-100">
-												{getCustomerName(o.customerId)}
+											{getCustomerName(o)}
 											</span>
 										</div>
 										<div className="flex items-center gap-4">

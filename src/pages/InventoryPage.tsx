@@ -106,11 +106,6 @@ export default function InventoryPage() {
 		const quantity = parseFloat(form.quantity);
 		const alertQty = form.alert_quantity ? parseFloat(form.alert_quantity) : null;
 
-		if (isNaN(quantity) || quantity < 0) {
-			toast.error('Por favor, insira uma quantidade válida');
-			return;
-		}
-
 		if (alertQty !== null && (isNaN(alertQty) || alertQty < 0)) {
 			toast.error('Por favor, insira uma quantidade de alerta válida');
 			return;

@@ -115,11 +115,20 @@ export type OrderStatus = "request" | "in_progress" | "refuse" | "canceled" | "f
 
 export interface BackendOrder {
 	id: string;
-	customerId?: string | null; // UUID reference to customer
+	customer_id?: string | null; // UUID reference to customer
+	customerId?: string | null; // @deprecated - use customer_id
 	notes?: string | null;
 	products: string[]; // array of product UUIDs (can repeat for multiple quantities)
 	status: OrderStatus;
 	created_at: string;
+	updated_at?: string;
+	total?: string;
+	customer?: BackendCustomer | null; // Embedded customer object (when expanded)
+	order_items?: Array<{
+		item_id: string;
+		quantity: number;
+		item?: BackendItem;
+	}>;
 }
 
 export interface CreateOrderDto {
