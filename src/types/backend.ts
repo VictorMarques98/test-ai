@@ -61,12 +61,14 @@ export interface BackendStock {
 export interface CreateStockDto {
 	itemId: string;
 	quantity: number;
+	purchase_price: number; // Purchase/cost value for the stock being added
 	alert_quantity?: number | null;
 }
 
 export interface UpdateStockDto {
 	operation: "add" | "remove";
 	quantity: number;
+	purchase_price?: number; // Purchase/cost value (when adding stock)
 	alert_quantity?: number | null;
 }
 
@@ -91,6 +93,7 @@ export interface BackendProduct {
 	description?: string | null;
 	price?: number | null; // selling price (informational)
 	buyPrice?: number | null; // cost price (informational)
+	is_additional?: boolean; // Whether this product is an additional (e.g. extra)
 	items: ProductItemDto[];
 }
 
@@ -99,6 +102,7 @@ export interface CreateProductDto {
 	description?: string | null;
 	price?: number | null;
 	buyPrice?: number | null;
+	is_additional?: boolean; // Whether this product is an additional (e.g. extra)
 	items: ProductItemDto[];
 }
 
@@ -107,18 +111,40 @@ export interface UpdateProductDto {
 	description?: string | null;
 	price?: number | null;
 	buyPrice?: number | null;
+	is_additional?: boolean; // Whether this product is an additional (e.g. extra)
 	items?: ProductItemDto[];
 }
 
 // Orders
 export type OrderStatus = "request" | "in_progress" | "refuse" | "canceled" | "finish";
 
+export interface BackendOrderProduct {
+	id: string;
+	name: string;
+	description?: string | null;
+	price: string;
+	buy_price: string;
+	quantity: string;
+	total: string;
+	created_at: string;
+	updated_at: string;
+	items?: Array<{
+		id: string;
+		name: string;
+		description?: string | null;
+		unit_type: UnitType;
+		quantity: string;
+		created_at: string;
+		updated_at: string;
+	}>;
+}
+
 export interface BackendOrder {
 	id: string;
 	customer_id?: string | null; // UUID reference to customer
 	customerId?: string | null; // @deprecated - use customer_id
 	notes?: string | null;
-	products: string[]; // array of product UUIDs (can repeat for multiple quantities)
+	products: BackendOrderProduct[]; // array of embedded product objects
 	status: OrderStatus;
 	created_at: string;
 	updated_at?: string;
@@ -133,6 +159,7 @@ export interface BackendOrder {
 
 export interface CreateOrderDto {
 	customerId?: string | null; // UUID reference to customer
+	forced_total?: number; // If provided, this value is used as the order total instead of calculating from product prices
 	notes?: string | null;
 	products: string[]; // array of product UUIDs
 }

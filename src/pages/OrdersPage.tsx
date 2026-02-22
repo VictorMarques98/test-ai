@@ -47,6 +47,7 @@ export default function OrdersPage() {
 	const [selectedProducts, setSelectedProducts] = useState<{ productId: string; quantity: number }[]>([]);
 	const [customerId, setCustomerId] = useState<string>("");
 	const [notes, setNotes] = useState<string>("");
+	const [forcedTotal, setForcedTotal] = useState<string>("");
 	const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 	const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -129,6 +130,7 @@ export default function OrdersPage() {
 
 			const data = {
 				customerId: customerId && customerId !== "none" ? customerId : undefined,
+				forced_total: forcedTotal ? Number(forcedTotal) : undefined,
 				notes: notes.trim() || undefined,
 				products: productsArray,
 			};
@@ -144,6 +146,7 @@ export default function OrdersPage() {
 					setSelectedProducts([]);
 					setCustomerId("");
 					setNotes("");
+					setForcedTotal("");
 					setEditingOrderId(null);
 					setSubmitMessage(null);
 					setOpen(false);
@@ -249,7 +252,7 @@ export default function OrdersPage() {
 						<div>
 							<h1 className="text-3xl font-bold text-white">Pedidos</h1>
 							<p className="text-slate-300 mt-1">
-								Acompanhe os pedidos dos clientes e o impacto no estoque
+								Acompanhe os pedidos dos clientes, atualize status e gerencie as informações de cada um.
 							</p>
 						</div>
 					</div>
@@ -261,6 +264,7 @@ export default function OrdersPage() {
 								setSelectedProducts([]);
 								setCustomerId("");
 								setNotes("");
+								setForcedTotal("");
 								setEditingOrderId(null);
 							}
 						}}>
@@ -322,6 +326,20 @@ export default function OrdersPage() {
 										value={notes}
 										onChange={(e) => setNotes(e.target.value)}
 									/>
+								</div>
+								<div className="space-y-1.5">
+									<label className="text-sm font-medium">Total Customizado (opcional)</label>
+									<Input
+										type="number"
+										placeholder="Ex: 45.50"
+										step="0.01"
+										min="0"
+										value={forcedTotal}
+										onChange={(e) => setForcedTotal(e.target.value)}
+									/>
+									<p className="text-xs text-muted-foreground">
+										Se informado, este valor será usado ao invés do total calculado
+									</p>
 								</div>
 								<div className="flex items-center justify-between">
 									<p className="text-sm font-medium">Produtos *</p>
@@ -531,19 +549,20 @@ export default function OrdersPage() {
 						
 						// Use products array if available, otherwise fall back to order_items
 						if (o.products && o.products.length > 0) {
-							o.products.forEach((productId) => {
-								const product = products.find(p => p.id === productId);
-								const productName = product?.name || getProductName(productId);
-								const productPrice = Number(product?.price || 0);
+							(o.products as any[]).forEach((product: any) => {
+								const productId = product.id;
+								const productName = product.name || "Produto";
+								const productPrice = Number(product.price || 0);
+								const productQuantity = Number(product.quantity || 1);
 								
 								if (productMap.has(productId)) {
 									const existing = productMap.get(productId)!;
-									existing.quantity += 1;
+									existing.quantity += productQuantity;
 								} else {
 									productMap.set(productId, {
 										name: productName,
 										price: productPrice,
-										quantity: 1
+										quantity: productQuantity
 									});
 								}
 							});
@@ -624,21 +643,23 @@ export default function OrdersPage() {
 											{Array.from(productMap.entries()).map(([productId, product]) => (
 												<div
 													key={productId}
-													className="flex items-center justify-between py-2.5 px-3 bg-gradient-to-r from-secondary/40 to-secondary/20 rounded-lg border border-secondary/50 hover:border-secondary transition-colors">
-													<div className="flex items-center gap-3 flex-1">
-														<div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
-															{product.quantity}
-														</div>
-														<div className="flex flex-col">
+													className="py-3 px-4 bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary/50 transition-colors">
+													<div className="flex items-center justify-between gap-4">
+														<div className="flex items-center gap-3 flex-1">
+															<div className="flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-md bg-primary/10 text-primary font-bold text-sm">
+																{product.quantity}×
+															</div>
 															<span className="text-sm font-semibold text-foreground">
 																{product.name}
 															</span>
-															{product.price > 0 && (
-																<span className="text-xs text-muted-foreground">
-																	${product.price.toFixed(2)} × {product.quantity} = ${(product.price * product.quantity).toFixed(2)}
-																</span>
-															)}
 														</div>
+														{product.price > 0 && (
+															<div className="flex items-center gap-3 text-sm">
+																<span className="text-foreground font-bold">
+																	${(product.price * product.quantity).toFixed(2)}
+																</span>
+															</div>
+														)}
 													</div>
 												</div>
 											))}

@@ -60,6 +60,7 @@ export default function ItemsPage() {
 		description: "", 
 		unit_type: "" as UnitType | "",
 		quantity: "",
+		purchase_price: "",
 		alert_quantity: ""
 	});
 
@@ -99,8 +100,7 @@ export default function ItemsPage() {
 			name: "", 
 			description: "", 
 			unit_type: "" as "",
-			quantity: "",
-			alert_quantity: ""
+			quantity: "",			purchase_price: "",			alert_quantity: ""
 		});
 		setEditId(null);
 	};
@@ -145,9 +145,12 @@ export default function ItemsPage() {
 				
 				// Create stock for the new item
 				if (quantity !== null) {
+					const purchasePrice = form.purchase_price ? parseFloat(form.purchase_price) : 0;
+					
 					await createStock({
 						itemId: newItem.id,
 						quantity: quantity,
+						purchase_price: purchasePrice,
 						alert_quantity: alertQty
 					});
 				}
@@ -171,6 +174,7 @@ export default function ItemsPage() {
 			description: item.description || "",
 			unit_type: item.unit_type,
 			quantity: "",
+			purchase_price: "",
 			alert_quantity: ""
 		});
 		setOpen(true);
@@ -292,17 +296,28 @@ export default function ItemsPage() {
 								</div>
 
 						{!editId && (
-						<div className="grid grid-cols-2 gap-4">
-						<div className="space-y-1.5">
-							<label className="text-sm font-medium">Estoque Inicial *</label>
-							<Input
-								type="number"
-								placeholder="Ex: 100"
-								value={form.quantity}
-								onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-								disabled={isLoading}
-								min="0.01"
-								step="0.01"
+					<div className="grid grid-cols-3 gap-4">
+					<div className="space-y-1.5">
+						<label className="text-sm font-medium">Estoque Inicial *</label>
+						<Input
+							type="number"
+							placeholder="Ex: 100"
+							value={form.quantity}
+							onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+							disabled={isLoading}
+							min="0.01"
+							step="0.01"
+						/>
+					</div>
+					<div className="space-y-1.5">
+						<label className="text-sm font-medium">Preço de Compra *</label>
+						<Input
+							type="number"
+							placeholder="Ex: 25.50"
+							value={form.purchase_price}
+							onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+							disabled={isLoading}
+							min="0"
 							/>
 						</div>
 						<div className="space-y-1.5">

@@ -67,8 +67,10 @@ export default function StockPage() {
 	const [form, setForm] = useState({ 
 		itemId: "",
 		quantity: "",
+		purchase_price: "",
 		alert_quantity: "",
 		operationQuantity: "",
+		operationPurchasePrice: "",
 		operationAlertQuantity: "",
 		editName: "",
 		editDescription: "",
@@ -105,8 +107,10 @@ export default function StockPage() {
 		setForm({ 
 			itemId: "",
 			quantity: "",
+			purchase_price: "",
 			alert_quantity: "",
 			operationQuantity: "",
+			operationPurchasePrice: "",
 			operationAlertQuantity: "",
 			editName: "",
 			editDescription: "",
@@ -115,16 +119,22 @@ export default function StockPage() {
 	};
 
 	const handleCreateStock = async () => {
-		if (!form.itemId || !form.quantity) {
-			toast.error('Por favor, selecione um item e informe a quantidade');
+		if (!form.itemId || !form.quantity || !form.purchase_price) {
+			toast.error('Por favor, preencha todos os campos obrigatórios');
 			return;
 		}
 
 		const quantity = parseFloat(form.quantity);
+		const purchasePrice = parseFloat(form.purchase_price);
 		const alertQty = form.alert_quantity ? parseFloat(form.alert_quantity) : null;
 
 		if (isNaN(quantity) || quantity < 0.01) {
 			toast.error('Quantidade deve ser maior que 0');
+			return;
+		}
+
+		if (isNaN(purchasePrice) || purchasePrice < 0) {
+			toast.error('Preço de compra inválido');
 			return;
 		}
 
@@ -137,6 +147,7 @@ export default function StockPage() {
 			await createStock({
 				itemId: form.itemId,
 				quantity: quantity,
+				purchase_price: purchasePrice,
 				alert_quantity: alertQty
 			});
 			
@@ -156,11 +167,22 @@ export default function StockPage() {
 			return;
 		}
 
+		if (operation === 'add' && !form.operationPurchasePrice) {
+			toast.error('Por favor, informe o preço de compra');
+			return;
+		}
+
 		const quantity = parseFloat(form.operationQuantity);
 		const alertQty = form.operationAlertQuantity ? parseFloat(form.operationAlertQuantity) : undefined;
+		const purchasePrice = form.operationPurchasePrice ? parseFloat(form.operationPurchasePrice) : undefined;
 
 		if (isNaN(quantity) || quantity < 0.01) {
 			toast.error('Quantidade deve ser maior que 0');
+			return;
+		}
+
+		if (operation === 'add' && purchasePrice !== undefined && (isNaN(purchasePrice) || purchasePrice < 0)) {
+			toast.error('Preço de compra inválido');
 			return;
 		}
 
@@ -168,8 +190,9 @@ export default function StockPage() {
 			await updateStock(selectedStockId, {
 				operation,
 				quantity: quantity,
+				purchase_price: operation === 'add' ? purchasePrice : undefined,
 				alert_quantity: alertQty
-			});
+			} as any);
 			
 			toast.success(`Estoque ${operation === 'add' ? 'adicionado' : 'removido'} com sucesso!`);
 			resetForm();
@@ -390,6 +413,23 @@ export default function StockPage() {
 								autoFocus
 							/>
 						</div>
+						{operation === 'add' && (
+							<div className="space-y-1.5">
+								<label className="text-sm font-medium">Preço de Compra *</label>
+								<Input
+									type="number"
+									placeholder="Ex: 25.50"
+									value={form.operationPurchasePrice}
+									onChange={(e) => setForm({ ...form, operationPurchasePrice: e.target.value })}
+									disabled={isLoading}
+									min="0"
+									step="0.01"
+								/>
+								<p className="text-xs text-muted-foreground">
+									Valor de custo/compra deste reabastecimento
+								</p>
+							</div>
+						)}
 						<div className="space-y-1.5">
 							<label className="text-sm font-medium">Atualizar Quantidade de Alerta (opcional)</label>
 							<Input

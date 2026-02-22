@@ -16,6 +16,7 @@ export type {
 	CreateOrderDto,
 	UpdateOrderStatusDto,
 	OrderItem,
+	OrderProduct,
 	OrderStatus,
 	ApiError,
 } from './api';

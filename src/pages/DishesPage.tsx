@@ -31,6 +31,7 @@ export default function DishesPage() {
 	const [description, setDescription] = useState("");
 	const [price, setPrice] = useState("");
 	const [buyPrice, setBuyPrice] = useState("");
+	const [isAdditional, setIsAdditional] = useState(false);
 	const [productItems, setProductItems] = useState<ProductItemDto[]>([]);
 
 	// Fetch data on mount
@@ -67,6 +68,7 @@ export default function DishesPage() {
 		setDescription("");
 		setPrice("");
 		setBuyPrice("");
+		setIsAdditional(false);
 		setProductItems([]);
 		setEditId(null);
 	};
@@ -83,6 +85,7 @@ export default function DishesPage() {
 				description: description.trim() || undefined,
 				price: price ? Number(price) : undefined,
 				buyPrice: buyPrice ? Number(buyPrice) : undefined,
+				is_additional: isAdditional,
 				items: productItems,
 			};
 
@@ -106,6 +109,7 @@ export default function DishesPage() {
 		setDescription(product.description || "");
 		setPrice(product.price ? String(product.price) : "");
 		setBuyPrice(product.buyPrice ? String(product.buyPrice) : "");
+		setIsAdditional(product.is_additional || false);
 		
 		// Map product_items to ProductItemDto format
 		const mappedItems: ProductItemDto[] = (product.product_items || []).map(pi => ({
@@ -196,6 +200,18 @@ export default function DishesPage() {
 										value={description}
 										onChange={(e) => setDescription(e.target.value)}
 									/>
+								</div>
+								<div className="flex items-center space-x-2">
+									<input
+										type="checkbox"
+										id="is_additional"
+										checked={isAdditional}
+										onChange={(e) => setIsAdditional(e.target.checked)}
+										className="h-4 w-4 rounded border-gray-300"
+									/>
+									<label htmlFor="is_additional" className="text-sm font-medium cursor-pointer">
+										É um adicional (ex: extra)
+									</label>
 								</div>
 								<div className="grid grid-cols-2 gap-3">
 									<div className="space-y-1.5">
