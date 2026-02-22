@@ -120,6 +120,22 @@ export default function OrdersPage() {
 		}
 	}, [error, clearError]);
 
+	// Auto-calculate total when products change
+	useEffect(() => {
+		if (selectedProducts.length > 0) {
+			const productsArray: string[] = [];
+			selectedProducts.forEach(item => {
+				for (let i = 0; i < item.quantity; i++) {
+					productsArray.push(item.productId);
+				}
+			});
+			const calculatedTotal = calculateOrderTotal(productsArray);
+			setForcedTotal(calculatedTotal.toFixed(2));
+		} else {
+			setForcedTotal("");
+		}
+	}, [selectedProducts, products]);
+
 	const addItem = () => {
 		if (products.length === 0) return;
 		setSelectedProducts([...selectedProducts, { productId: products[0].id, quantity: 1 }]);
@@ -349,20 +365,6 @@ export default function OrdersPage() {
 										onChange={(e) => setNotes(e.target.value)}
 									/>
 								</div>
-								<div className="space-y-1.5">
-									<label className="text-sm font-medium">Total Customizado (opcional)</label>
-									<Input
-										type="number"
-										placeholder="Ex: 45.50"
-										step="0.01"
-										min="0"
-										value={forcedTotal}
-										onChange={(e) => setForcedTotal(e.target.value)}
-									/>
-									<p className="text-xs text-muted-foreground">
-										Se informado, este valor será usado ao invés do total calculado
-									</p>
-								</div>
 								<div className="flex items-center justify-between">
 									<p className="text-sm font-medium">Produtos *</p>
 									<Button variant="outline" size="sm" onClick={addItem}>
@@ -417,22 +419,27 @@ export default function OrdersPage() {
 								</div>
 
 								{selectedProducts.length > 0 && (
+								<div className="space-y-2">
 									<div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
-										<span className="font-semibold text-slate-700 dark:text-slate-300">
-											Total Estimado:
-										</span>
-										<span className="text-2xl font-bold text-primary">
-											${(() => {
-												const productsArray: string[] = [];
-												selectedProducts.forEach(item => {
-													for (let i = 0; i < item.quantity; i++) {
-														productsArray.push(item.productId);
-													}
-												});
-												return calculateOrderTotal(productsArray).toFixed(2);
-											})()}
-										</span>
+										<div className="flex flex-1 flex-row justify-between gap-3 items-center">
+											<label className="text-lg font-semibold text-slate-700 dark:text-slate-300 block">
+												Total do Pedido ($):
+											</label>
+											<Input
+												type="number"
+												placeholder="0.00"
+												step="0.01"
+												min="0"
+												value={forcedTotal}
+												onChange={(e) => setForcedTotal(e.target.value)}
+												className="text-lg font-bold text-primary h-12 w-max"
+											/>
+										</div>
 									</div>
+									<p className="text-xs text-muted-foreground">
+										Valor calculado automaticamente. Você pode editar se necessário.
+									</p>
+								</div>
 								)}
 
 								<Button 
