@@ -1,37 +1,33 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useReactToPrint } from "react-to-print";
-import { useRestaurantStore } from "@/store/restaurantStoreApi";
-import { useCustomers } from "@/hooks/useCustomers";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCustomers } from "@/hooks/useCustomers";
+import { useRestaurantStore } from "@/store/restaurantStoreApi";
+import type { Order } from "@/types/api";
 import {
-	Plus,
-	ShoppingCart,
+	AlertCircle,
 	AlertTriangle,
 	CheckCircle2,
-	X,
-	ClipboardList,
-	Trash2,
-	Filter,
-	XCircle,
 	ChevronDown,
-	ChevronUp,
-	Edit,
-	UserPlus,
-	Loader2,
-	AlertCircle,
-	Printer,
 	ChevronRight,
+	ClipboardList,
+	Filter,
+	Loader2,
+	Plus,
+	Printer,
+	ShoppingCart,
+	UserPlus,
+	X,
+	XCircle
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from "sonner";
-import { OrderLabelsTemplate } from "@/components/OrderLabelsTemplate";
-import type { Order } from "@/types/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useReactToPrint } from "react-to-print";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 
 export default function OrdersPage() {
 	const location = useLocation();
@@ -47,7 +43,7 @@ export default function OrdersPage() {
 		updateOrderStatus,
 		clearError 
 	} = useRestaurantStore();
-	const { customers, loading: customersLoading } = useCustomers();
+	const { customers } = useCustomers();
 	const [open, setOpen] = useState(false);
 	const [selectedProducts, setSelectedProducts] = useState<{ productId: string; quantity: number }[]>([]);
 	const [customerId, setCustomerId] = useState<string>("");
@@ -77,10 +73,10 @@ export default function OrdersPage() {
 				updateOrderStatus(orderToPrint.id, 'finish')
 					.then(() => {
 						fetchOrders();
-						toast.success('Pedido finalizado!');
+						showSuccessToast('Pedido finalizado!');
 					})
 					.catch((error: any) => {
-						toast.error(error.message || 'Falha ao finalizar pedido');
+						showErrorToast(error.message || 'Falha ao finalizar pedido');
 					})
 					.finally(() => {
 						setOrderToPrint(null);
@@ -151,7 +147,7 @@ export default function OrdersPage() {
 
 	const handleSubmit = async () => {
 		if (selectedProducts.length === 0) {
-			setSubmitMessage({ type: 'error', text: 'Adicione pelo menos um produto ao pedido' });
+			setSubmitMessage({ type: 'error', text: 'Adicione pelo menos um prato ao pedido' });
 			return;
 		}
 
@@ -745,9 +741,9 @@ export default function OrdersPage() {
 														try {
 															await updateOrderStatus(o.id, 'in_progress');
 															await fetchOrders();
-															toast.success('Pedido iniciado!');
+															showSuccessToast('Pedido iniciado!');
 														} catch (error: any) {
-															toast.error(error.message || 'Falha ao atualizar pedido');
+															showErrorToast(error.message || 'Falha ao atualizar pedido');
 														}
 													}}
 													className="bg-blue-50 border-blue-600 text-blue-700 hover:bg-blue-100 hover:border-blue-700 hover:text-blue-800">
@@ -776,9 +772,9 @@ export default function OrdersPage() {
 														try {
 															await updateOrderStatus(o.id, 'canceled');
 															await fetchOrders();
-															toast.success('Pedido cancelado!');
+															showSuccessToast('Pedido cancelado!');
 														} catch (error: any) {
-															toast.error(error.message || 'Falha ao cancelar pedido');
+															showErrorToast(error.message || 'Falha ao cancelar pedido');
 														}
 													}}
 													className="bg-orange-50 border-orange-600 text-orange-700 hover:bg-orange-100 hover:border-orange-700 hover:text-orange-800">
@@ -794,17 +790,6 @@ export default function OrdersPage() {
 					})}
 				</div>
 			)}
-
-		{/* Hidden printable component */}
-		<div>
-			{orderToPrint && (
-				<OrderLabelsTemplate
-					ref={printRef}
-					order={orderToPrint}
-					customerName={getCustomerName(orderToPrint)}
-				/>
-			)}
-		</div>
 	</div>
 	);
 }
