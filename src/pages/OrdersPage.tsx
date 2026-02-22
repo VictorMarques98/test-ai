@@ -28,6 +28,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import { OrderLabelsTemplate } from "@/components/OrderLabelsTemplate";
 
 export default function OrdersPage() {
 	const location = useLocation();
@@ -342,6 +343,37 @@ export default function OrdersPage() {
 		setFilterDateTo("");
 	};
 
+	// Calculate dishes to prepare from in_progress orders
+	const dishesToPrepare = useMemo(() => {
+		const productMap = new Map<string, { name: string; total: number }>();
+		
+		orders
+			.filter(order => order.status === 'in_progress')
+			.forEach(order => {
+				if (order.products && order.products.length > 0) {
+					(order.products as any[]).forEach((product: any) => {
+						const productId = product.id;
+						const productName = product.name || "Produto";
+						const productQuantity = Number(product.quantity || 1);
+						
+						if (productMap.has(productId)) {
+							const existing = productMap.get(productId)!;
+							existing.total += productQuantity;
+						} else {
+							productMap.set(productId, {
+								name: productName,
+								total: productQuantity
+							});
+						}
+					});
+				}
+			});
+		
+		return Array.from(productMap.entries())
+			.map(([id, data]) => ({ id, ...data }))
+			.sort((a, b) => b.total - a.total);
+	}, [orders]);
+
 	return (
 		<div className="space-y-6">
 			{/* Header Section */}
@@ -549,6 +581,37 @@ export default function OrdersPage() {
 					</Dialog>
 				</div>
 			</div>
+
+			{/* Dishes to Prepare Cards */}
+			{dishesToPrepare.length > 0 && (
+				<div className="space-y-3">
+					<div className="flex items-center justify-between">
+						<div>
+							<h2 className="text-lg font-semibold">Pratos em Preparo</h2>
+							<p className="text-sm text-muted-foreground">
+								Quantidade de cada prato nos pedidos em andamento
+							</p>
+						</div>
+						<Badge variant="secondary" className="text-base px-3 py-1">
+							{dishesToPrepare.reduce((sum, dish) => sum + dish.total, 0)} total
+						</Badge>
+					</div>
+					<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+						{dishesToPrepare.map((dish) => (
+							<Card key={dish.id} className="overflow-hidden">
+								<CardContent className="p-4">
+									<div className="flex flex-col items-center text-center gap-2">
+										<div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+											<span className="text-2xl font-bold text-primary">{dish.total}</span>
+										</div>
+										<p className="text-sm font-semibold leading-tight">{dish.name}</p>
+									</div>
+								</CardContent>
+							</Card>
+						))}
+					</div>
+				</div>
+			)}
 
 			{/* Error Alert */}
 			{error && (
@@ -890,6 +953,15 @@ export default function OrdersPage() {
 					})}
 				</div>
 			)}
-	</div>
+			{/* Hidden print template */}
+			{orderToPrint && (
+				<div style={{ display: 'none' }}>
+					<OrderLabelsTemplate
+						ref={printRef}
+						order={orderToPrint}
+						customerName={getCustomerName(orderToPrint)}
+					/>
+				</div>
+			)}	</div>
 	);
 }
