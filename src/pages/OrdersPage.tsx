@@ -68,20 +68,8 @@ export default function OrdersPage() {
 		contentRef: printRef,
 		documentTitle: `Pedido-${orderToPrint?.id.substring(0, 8).toUpperCase()}`,
 		onAfterPrint: () => {
-			// Only finish the order after printing is complete
-			if (orderToPrint) {
-				updateOrderStatus(orderToPrint.id, 'finish')
-					.then(() => {
-						fetchOrders();
-						showSuccessToast('Pedido finalizado!');
-					})
-					.catch((error: any) => {
-						showErrorToast(error.message || 'Falha ao finalizar pedido');
-					})
-					.finally(() => {
-						setOrderToPrint(null);
-					});
-			}
+			// Just clear the order after printing
+			setOrderToPrint(null);
 		},
 	});
 
@@ -761,9 +749,25 @@ export default function OrdersPage() {
 													// Set order to print, which will trigger the print dialog
 													setOrderToPrint(o);
 												}}
-												className="bg-green-50 border-green-600 text-green-700 hover:bg-green-100 hover:border-green-700 hover:text-green-800">
+												className="bg-blue-50 border-blue-600 text-blue-700 hover:bg-blue-100 hover:border-blue-700 hover:text-blue-800">
 												<Printer className="w-3 h-3 mr-1" />
-												Finalizar e Imprimir
+												Imprimir
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
+													onClick={async () => {
+														try {
+															await updateOrderStatus(o.id, 'finish');
+															await fetchOrders();
+															showSuccessToast('Pedido finalizado!');
+														} catch (error: any) {
+															showErrorToast(error.message || 'Falha ao finalizar pedido');
+														}
+													}}
+													className="bg-green-50 border-green-600 text-green-700 hover:bg-green-100 hover:border-green-700 hover:text-green-800">
+													<CheckCircle2 className="w-3 h-3 mr-1" />
+													Finalizar
 												</Button>
 												<Button
 													size="sm"
