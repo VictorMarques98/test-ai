@@ -133,7 +133,6 @@ export const OrderLabelsTemplate = forwardRef<HTMLDivElement, OrderLabelsTemplat
 							.label-grid {
 								display: grid;
 								grid-template-columns: repeat(3, 1fr);
-								gap: 12px;
 								max-width: 210mm;
 								margin: 0 auto;
 							}
