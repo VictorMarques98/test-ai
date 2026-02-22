@@ -16,11 +16,11 @@ import type { UnitType } from "@/types/api";
 // Helper function to get unit display information
 const getUnitDisplay = (unitType: UnitType) => {
 	const displays = {
-		grams: { label: '📏 Gramas', abbr: 'g', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-500', decimals: 2 },
-		kg: { label: '⚖️ Quilogramas', abbr: 'kg', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-500', decimals: 2 },
-		ml: { label: '💧 Mililitros', abbr: 'ml', color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-500', decimals: 2 },
-		liters: { label: '🍶 Litros', abbr: 'L', color: 'bg-teal-500/10 text-teal-600 dark:text-teal-500', decimals: 2 },
-		unit: { label: '🔢 Unidade', abbr: 'un', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-500', decimals: 0 }
+		grams: { label: 'Gramas', abbr: 'g', color: 'bg-blue-500/10 text-blue-600 dark:text-blue-500', decimals: 2 },
+		kg: { label: 'Quilogramas', abbr: 'kg', color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-500', decimals: 2 },
+		ml: { label: 'Mililitros', abbr: 'ml', color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-500', decimals: 2 },
+		liters: { label: 'Litros', abbr: 'L', color: 'bg-teal-500/10 text-teal-600 dark:text-teal-500', decimals: 2 },
+		unit: { label: 'Unidade', abbr: 'un', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-500', decimals: 0 }
 	};
 	return displays[unitType];
 };
@@ -105,11 +105,6 @@ export default function InventoryPage() {
 
 		const quantity = parseFloat(form.quantity);
 		const alertQty = form.alert_quantity ? parseFloat(form.alert_quantity) : null;
-
-		if (isNaN(quantity) || quantity < 0) {
-			toast.error('Por favor, insira uma quantidade válida');
-			return;
-		}
 
 		if (alertQty !== null && (isNaN(alertQty) || alertQty < 0)) {
 			toast.error('Por favor, insira uma quantidade de alerta válida');

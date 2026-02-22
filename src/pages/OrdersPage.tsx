@@ -1,32 +1,34 @@
-import { useState, useMemo, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useRestaurantStore } from "@/store/restaurantStoreApi";
-import { useCustomers } from "@/hooks/useCustomers";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCustomers } from "@/hooks/useCustomers";
+import { useRestaurantStore } from "@/store/restaurantStoreApi";
+import type { Order } from "@/types/api";
 import {
-	Plus,
-	ShoppingCart,
+	AlertCircle,
 	AlertTriangle,
 	CheckCircle2,
-	X,
-	ClipboardList,
-	Trash2,
-	Filter,
-	XCircle,
 	ChevronDown,
-	ChevronUp,
-	Edit,
-	UserPlus,
+	ChevronRight,
+	ClipboardList,
+	Filter,
 	Loader2,
-	AlertCircle,
+	Plus,
+	Printer,
+	ShoppingCart,
+	UserPlus,
+	X,
+	XCircle
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toast } from "sonner";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useReactToPrint } from "react-to-print";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import { OrderLabelsTemplate } from "@/components/OrderLabelsTemplate";
 
 export default function OrdersPage() {
 	const location = useLocation();
@@ -42,11 +44,12 @@ export default function OrdersPage() {
 		updateOrderStatus,
 		clearError 
 	} = useRestaurantStore();
-	const { customers, loading: customersLoading } = useCustomers();
+	const { customers } = useCustomers();
 	const [open, setOpen] = useState(false);
 	const [selectedProducts, setSelectedProducts] = useState<{ productId: string; quantity: number }[]>([]);
 	const [customerId, setCustomerId] = useState<string>("");
 	const [notes, setNotes] = useState<string>("");
+	const [forcedTotal, setForcedTotal] = useState<string>("");
 	const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 	const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -56,6 +59,27 @@ export default function OrdersPage() {
 	const [filterOrderNumber, setFilterOrderNumber] = useState<string>("");
 	const [filterDateFrom, setFilterDateFrom] = useState<string>("");
 	const [filterDateTo, setFilterDateTo] = useState<string>("");
+
+	// Print states
+	const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
+	const printRef = useRef<HTMLDivElement>(null);
+
+	// Print handler
+	const handlePrint = useReactToPrint({
+		contentRef: printRef,
+		documentTitle: `Pedido-${orderToPrint?.id.substring(0, 8).toUpperCase()}`,
+		onAfterPrint: () => {
+			// Just clear the order after printing
+			setOrderToPrint(null);
+		},
+	});
+
+	// Trigger print when orderToPrint is set
+	useEffect(() => {
+		if (orderToPrint && printRef.current) {
+			handlePrint();
+		}
+	}, [orderToPrint, handlePrint]);
 
 	// Fetch data on mount
 	useEffect(() => {
@@ -97,6 +121,22 @@ export default function OrdersPage() {
 		}
 	}, [error, clearError]);
 
+	// Auto-calculate total when products change
+	useEffect(() => {
+		if (selectedProducts.length > 0) {
+			const productsArray: string[] = [];
+			selectedProducts.forEach(item => {
+				for (let i = 0; i < item.quantity; i++) {
+					productsArray.push(item.productId);
+				}
+			});
+			const calculatedTotal = calculateOrderTotal(productsArray);
+			setForcedTotal(calculatedTotal.toFixed(2));
+		} else {
+			setForcedTotal("");
+		}
+	}, [selectedProducts, products]);
+
 	const addItem = () => {
 		if (products.length === 0) return;
 		setSelectedProducts([...selectedProducts, { productId: products[0].id, quantity: 1 }]);
@@ -112,7 +152,7 @@ export default function OrdersPage() {
 
 	const handleSubmit = async () => {
 		if (selectedProducts.length === 0) {
-			setSubmitMessage({ type: 'error', text: 'Adicione pelo menos um produto ao pedido' });
+			setSubmitMessage({ type: 'error', text: 'Adicione pelo menos um prato ao pedido' });
 			return;
 		}
 
@@ -129,6 +169,7 @@ export default function OrdersPage() {
 
 			const data = {
 				customerId: customerId && customerId !== "none" ? customerId : undefined,
+				forced_total: forcedTotal ? Number(forcedTotal) : undefined,
 				notes: notes.trim() || undefined,
 				products: productsArray,
 			};
@@ -144,6 +185,7 @@ export default function OrdersPage() {
 					setSelectedProducts([]);
 					setCustomerId("");
 					setNotes("");
+					setForcedTotal("");
 					setEditingOrderId(null);
 					setSubmitMessage(null);
 					setOpen(false);
@@ -157,14 +199,84 @@ export default function OrdersPage() {
 	const getProductName = (id: string) => products.find((p) => p.id === id)?.name || "Desconhecido";
 	const getProductPrice = (id: string) => products.find((p) => p.id === id)?.price || 0;
 
-	const calculateOrderTotal = (orderProducts: string[]) => {
+	const calculateOriginalPrice = (orderProducts: string[]) => {
 		return orderProducts.reduce((total, productId) => {
 			const product = products.find((p) => p.id === productId);
 			return total + (Number(product?.price) || 0);
 		}, 0);
 	};
 
-	const getCustomerName = (customerId?: string | null) => {
+	const calculateOrderTotal = (orderProducts: string[]) => {
+		// Count non-additional products to determine discount tier
+		const nonAdditionalCount = orderProducts.filter(productId => {
+			const product = products.find((p) => p.id === productId);
+			return !product?.is_additional;
+		}).length;
+		
+		// Determine discount per product based on quantity
+		let discount = 0;
+		if (nonAdditionalCount >= 10) {
+			discount = 5;
+		} else if (nonAdditionalCount >= 5) {
+			discount = 3;
+		}
+		
+		// Calculate total with discount applied only to non-additional products
+		return orderProducts.reduce((total, productId) => {
+			const product = products.find((p) => p.id === productId);
+			const price = Number(product?.price) || 0;
+			
+			// Apply discount only to non-additional products
+			if (product?.is_additional) {
+				return total + price;
+			} else {
+				return total + Math.max(0, price - discount);
+			}
+		}, 0);
+	};
+
+	const getDiscountInfo = () => {
+		if (selectedProducts.length === 0) return null;
+		
+		const productsArray: string[] = [];
+		selectedProducts.forEach(item => {
+			for (let i = 0; i < item.quantity; i++) {
+				productsArray.push(item.productId);
+			}
+		});
+
+		const nonAdditionalCount = productsArray.filter(productId => {
+			const product = products.find((p) => p.id === productId);
+			return !product?.is_additional;
+		}).length;
+
+		let discountPerProduct = 0;
+		if (nonAdditionalCount >= 10) {
+			discountPerProduct = 5;
+		} else if (nonAdditionalCount >= 5) {
+			discountPerProduct = 3;
+		}
+
+		const originalPrice = calculateOriginalPrice(productsArray);
+		const discountedPrice = calculateOrderTotal(productsArray);
+		const totalDiscount = originalPrice - discountedPrice;
+
+		return {
+			originalPrice,
+			discountedPrice,
+			totalDiscount,
+			discountPerProduct,
+			nonAdditionalCount
+		};
+	};
+
+	const getCustomerName = (order: any) => {
+		// First check if customer data is embedded in the order
+		if (order.customer && order.customer.name) {
+			return order.customer.name;
+		}
+		// Otherwise try to find customer by ID
+		const customerId = order.customer_id || order.customerId;
 		if (!customerId) return "Cliente não informado";
 		const customer = customers.find((c) => c.id === customerId);
 		return customer?.name || "Cliente não encontrado";
@@ -231,6 +343,37 @@ export default function OrdersPage() {
 		setFilterDateTo("");
 	};
 
+	// Calculate dishes to prepare from in_progress orders
+	const dishesToPrepare = useMemo(() => {
+		const productMap = new Map<string, { name: string; total: number }>();
+		
+		orders
+			.filter(order => order.status === 'in_progress')
+			.forEach(order => {
+				if (order.products && order.products.length > 0) {
+					(order.products as any[]).forEach((product: any) => {
+						const productId = product.id;
+						const productName = product.name || "Produto";
+						const productQuantity = Number(product.quantity || 1);
+						
+						if (productMap.has(productId)) {
+							const existing = productMap.get(productId)!;
+							existing.total += productQuantity;
+						} else {
+							productMap.set(productId, {
+								name: productName,
+								total: productQuantity
+							});
+						}
+					});
+				}
+			});
+		
+		return Array.from(productMap.entries())
+			.map(([id, data]) => ({ id, ...data }))
+			.sort((a, b) => b.total - a.total);
+	}, [orders]);
+
 	return (
 		<div className="space-y-6">
 			{/* Header Section */}
@@ -243,7 +386,7 @@ export default function OrdersPage() {
 						<div>
 							<h1 className="text-3xl font-bold text-white">Pedidos</h1>
 							<p className="text-slate-300 mt-1">
-								Acompanhe os pedidos dos clientes e o impacto no estoque
+								Acompanhe os pedidos dos clientes, atualize status e gerencie as informações de cada um.
 							</p>
 						</div>
 					</div>
@@ -255,6 +398,7 @@ export default function OrdersPage() {
 								setSelectedProducts([]);
 								setCustomerId("");
 								setNotes("");
+								setForcedTotal("");
 								setEditingOrderId(null);
 							}
 						}}>
@@ -326,40 +470,47 @@ export default function OrdersPage() {
 								</div>
 								<div className="space-y-2">
 									{selectedProducts.length > 0 && (
-										<div className="grid grid-cols-[1fr_auto_auto] gap-2 px-2">
+										<div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-2">
 											<span className="text-xs font-medium text-muted-foreground">Produto</span>
+											<span className="text-xs font-medium text-muted-foreground w-24">Preço</span>
 											<span className="text-xs font-medium text-muted-foreground w-20">Qtd</span>
 											<span className="w-10"></span>
 										</div>
 									)}
-									{selectedProducts.map((item, idx) => (
-										<div key={idx} className="flex items-center gap-2">
-											<Select
-												value={item.productId}
-												onValueChange={(v) => updateItem(idx, "productId", v)}>
-												<SelectTrigger className="flex-1">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													{products.map((p) => (
-														<SelectItem key={p.id} value={p.id}>
-															{p.name} {p.price ? `- $${Number(p.price).toFixed(2)}` : ''}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-											<Input
-												type="number"
-												className="w-20"
-												min={1}
-												value={item.quantity}
-												onChange={(e) => updateItem(idx, "quantity", e.target.value)}
-											/>
-											<Button variant="ghost" size="icon" onClick={() => removeItem(idx)}>
-												<X className="w-3 h-3" />
-											</Button>
-										</div>
-									))}
+									{selectedProducts.map((item, idx) => {
+										const selectedProduct = products.find(p => p.id === item.productId);
+										return (
+											<div key={idx} className="flex items-center gap-2">
+												<Select
+													value={item.productId}
+													onValueChange={(v) => updateItem(idx, "productId", v)}>
+													<SelectTrigger className="flex-1">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														{products.map((p) => (
+															<SelectItem key={p.id} value={p.id}>
+																{p.name}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+												<div className="w-24 text-sm font-semibold text-muted-foreground text-left">
+													{selectedProduct?.price ? `$${Number(selectedProduct.price).toFixed(2)}` : '-'}
+												</div>
+												<Input
+													type="number"
+													className="w-20"
+													min={1}
+													value={item.quantity}
+													onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+												/>
+												<Button variant="ghost" size="icon" onClick={() => removeItem(idx)}>
+													<X className="w-3 h-3" />
+												</Button>
+											</div>
+										);
+									})}
 									{selectedProducts.length === 0 && (
 										<div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center gap-2">
 											<AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -370,24 +521,47 @@ export default function OrdersPage() {
 									)}
 								</div>
 
-								{selectedProducts.length > 0 && (
-									<div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
-										<span className="font-semibold text-slate-700 dark:text-slate-300">
-											Total Estimado:
-										</span>
-										<span className="text-2xl font-bold text-primary">
-											${(() => {
-												const productsArray: string[] = [];
-												selectedProducts.forEach(item => {
-													for (let i = 0; i < item.quantity; i++) {
-														productsArray.push(item.productId);
-													}
-												});
-												return calculateOrderTotal(productsArray).toFixed(2);
-											})()}
-										</span>
+{selectedProducts.length > 0 && (() => {
+						const discountInfo = getDiscountInfo();
+						return (
+							<div className="space-y-2">
+								{discountInfo && discountInfo.totalDiscount > 0 && (
+									<div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 space-y-1">
+										<div className="flex items-center gap-2">
+											<CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+											<p className="text-sm font-semibold text-green-800 dark:text-green-300">
+												Desconto Aplicado!
+											</p>
+										</div>
+										<div className="text-xs text-green-700 dark:text-green-400 space-y-0.5 ml-6">
+											<p>Preço original: <span className="line-through">${discountInfo.originalPrice.toFixed(2)}</span></p>
+											<p>Desconto: ${discountInfo.discountPerProduct.toFixed(2)} por produto ({discountInfo.nonAdditionalCount} produtos não adicionais)</p>
+											<p className="font-semibold">Economia total: ${discountInfo.totalDiscount.toFixed(2)}</p>
+										</div>
 									</div>
 								)}
+								<div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
+									<div className="flex flex-1 flex-row justify-between gap-3 items-center">
+										<label className="text-lg font-semibold text-slate-700 dark:text-slate-300 block">
+											Total do Pedido ($):
+										</label>
+										<Input
+											type="number"
+											placeholder="0.00"
+											step="0.01"
+											min="0"
+											value={forcedTotal}
+											onChange={(e) => setForcedTotal(e.target.value)}
+											className="text-lg font-bold text-primary h-12 w-max"
+										/>
+									</div>
+								</div>
+								<p className="text-xs text-muted-foreground">
+									Valor calculado automaticamente. Você pode editar se necessário.
+								</p>
+							</div>
+						);
+					})()}
 
 								<Button 
 									className="w-full" 
@@ -408,6 +582,37 @@ export default function OrdersPage() {
 				</div>
 			</div>
 
+			{/* Dishes to Prepare Cards */}
+			{dishesToPrepare.length > 0 && (
+				<div className="space-y-3">
+					<div className="flex items-center justify-between">
+						<div>
+							<h2 className="text-lg font-semibold">Pratos em Preparo</h2>
+							<p className="text-sm text-muted-foreground">
+								Quantidade de cada prato nos pedidos em andamento
+							</p>
+						</div>
+						<Badge variant="secondary" className="text-base px-3 py-1">
+							{dishesToPrepare.reduce((sum, dish) => sum + dish.total, 0)} total
+						</Badge>
+					</div>
+					<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+						{dishesToPrepare.map((dish) => (
+							<Card key={dish.id} className="overflow-hidden">
+								<CardContent className="p-4">
+									<div className="flex flex-col items-center text-center gap-2">
+										<div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+											<span className="text-2xl font-bold text-primary">{dish.total}</span>
+										</div>
+										<p className="text-sm font-semibold leading-tight">{dish.name}</p>
+									</div>
+								</CardContent>
+							</Card>
+						))}
+					</div>
+				</div>
+			)}
+
 			{/* Error Alert */}
 			{error && (
 				<Alert variant="destructive">
@@ -418,26 +623,44 @@ export default function OrdersPage() {
 
 			{/* Filters Section */}
 			<Card>
-				<CardContent className="pt-6">
-					<div className="flex items-center gap-2 mb-4">
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setFiltersExpanded(!filtersExpanded)}
-							className="h-8 px-2 -ml-2">
-							{filtersExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-						</Button>
-						<Filter className="w-4 h-4 text-muted-foreground" />
-						<h3 className="font-semibold text-sm">Filtros</h3>
-						{hasActiveFilters && (
-							<Button variant="ghost" size="sm" onClick={clearFilters} className="ml-auto h-7 text-xs">
-								<XCircle className="w-3 h-3 mr-1" />
-								Limpar filtros
+				<CardContent className="p-4">
+					<div className="space-y-4">
+						{/* Filter Header */}
+						<div className="flex items-center justify-between">
+							<Button
+								variant="ghost"
+								onClick={() => setFiltersExpanded(!filtersExpanded)}
+								className="flex items-center gap-2"
+							>
+								<Filter className="w-4 h-4" />
+								<span className="font-medium">Filtros</span>
+								{hasActiveFilters && (
+									<Badge variant="secondary" className="ml-2">
+										{[filterStatus !== "all", filterOrderNumber !== "", filterDateFrom !== "", filterDateTo !== ""].filter(Boolean).length}
+									</Badge>
+								)}
+								{filtersExpanded ? (
+									<ChevronDown className="w-4 h-4 ml-1" />
+								) : (
+									<ChevronRight className="w-4 h-4 ml-1" />
+								)}
 							</Button>
-						)}
-					</div>
-					{filtersExpanded && (
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+							{hasActiveFilters && (
+								<Button
+									variant="ghost"
+									size="sm"
+									onClick={clearFilters}
+									className="text-muted-foreground hover:text-foreground"
+								>
+									<XCircle className="w-4 h-4 mr-2" />
+									Limpar Filtros
+								</Button>
+							)}
+						</div>
+
+						{/* Filter Controls */}
+						{filtersExpanded && (
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2 border-t">
 							{/* Status Filter */}
 							<div className="space-y-1.5">
 								<label className="text-xs font-medium text-muted-foreground">Status</label>
@@ -489,9 +712,13 @@ export default function OrdersPage() {
 								/>
 							</div>
 						</div>
-					)}
-					<div className="mt-3 text-xs text-muted-foreground">
-						Mostrando {sortedOrders.length} de {orders.length} pedidos
+						)}
+
+						{/* Results Count */}
+						<div className="text-sm text-muted-foreground">
+							Mostrando <span className="font-semibold text-foreground">{sortedOrders.length}</span> de{" "}
+							<span className="font-semibold text-foreground">{orders.length}</span> pedidos
+						</div>
 					</div>
 				</CardContent>
 			</Card>
@@ -525,19 +752,20 @@ export default function OrdersPage() {
 						
 						// Use products array if available, otherwise fall back to order_items
 						if (o.products && o.products.length > 0) {
-							o.products.forEach((productId) => {
-								const product = products.find(p => p.id === productId);
-								const productName = product?.name || getProductName(productId);
-								const productPrice = Number(product?.price || 0);
+							(o.products as any[]).forEach((product: any) => {
+								const productId = product.id;
+								const productName = product.name || "Produto";
+								const productPrice = Number(product.price || 0);
+								const productQuantity = Number(product.quantity || 1);
 								
 								if (productMap.has(productId)) {
 									const existing = productMap.get(productId)!;
-									existing.quantity += 1;
+									existing.quantity += productQuantity;
 								} else {
 									productMap.set(productId, {
 										name: productName,
 										price: productPrice,
-										quantity: 1
+										quantity: productQuantity
 									});
 								}
 							});
@@ -570,7 +798,7 @@ export default function OrdersPage() {
 												Pedido #{o.id.slice(0, 8)}
 											</span>
 											<span className="text-base font-bold text-slate-900 dark:text-slate-100">
-												{getCustomerName(o.customerId)}
+											{getCustomerName(o)}
 											</span>
 										</div>
 										<div className="flex items-center gap-4">
@@ -618,21 +846,23 @@ export default function OrdersPage() {
 											{Array.from(productMap.entries()).map(([productId, product]) => (
 												<div
 													key={productId}
-													className="flex items-center justify-between py-2.5 px-3 bg-gradient-to-r from-secondary/40 to-secondary/20 rounded-lg border border-secondary/50 hover:border-secondary transition-colors">
-													<div className="flex items-center gap-3 flex-1">
-														<div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
-															{product.quantity}
-														</div>
-														<div className="flex flex-col">
+													className="py-3 px-4 bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary/50 transition-colors">
+													<div className="flex items-center justify-between gap-4">
+														<div className="flex items-center gap-3 flex-1">
+															<div className="flex items-center justify-center min-w-[2rem] h-8 px-2 rounded-md bg-primary/10 text-primary font-bold text-sm">
+																{product.quantity}×
+															</div>
 															<span className="text-sm font-semibold text-foreground">
 																{product.name}
 															</span>
-															{product.price > 0 && (
-																<span className="text-xs text-muted-foreground">
-																	${product.price.toFixed(2)} × {product.quantity} = ${(product.price * product.quantity).toFixed(2)}
-																</span>
-															)}
 														</div>
+														{product.price > 0 && (
+															<div className="flex items-center gap-3 text-sm">
+																<span className="text-foreground font-bold">
+																	${(product.price * product.quantity).toFixed(2)}
+																</span>
+															</div>
+														)}
 													</div>
 												</div>
 											))}
@@ -658,9 +888,9 @@ export default function OrdersPage() {
 														try {
 															await updateOrderStatus(o.id, 'in_progress');
 															await fetchOrders();
-															toast.success('Pedido iniciado!');
+															showSuccessToast('Pedido iniciado!');
 														} catch (error: any) {
-															toast.error(error.message || 'Falha ao atualizar pedido');
+															showErrorToast(error.message || 'Falha ao atualizar pedido');
 														}
 													}}
 													className="bg-blue-50 border-blue-600 text-blue-700 hover:bg-blue-100 hover:border-blue-700 hover:text-blue-800">
@@ -674,13 +904,24 @@ export default function OrdersPage() {
 												<Button
 													size="sm"
 													variant="outline"
+												onClick={() => {
+													// Set order to print, which will trigger the print dialog
+													setOrderToPrint(o);
+												}}
+												className="bg-blue-50 border-blue-600 text-blue-700 hover:bg-blue-100 hover:border-blue-700 hover:text-blue-800">
+												<Printer className="w-3 h-3 mr-1" />
+												Imprimir
+												</Button>
+												<Button
+													size="sm"
+													variant="outline"
 													onClick={async () => {
 														try {
 															await updateOrderStatus(o.id, 'finish');
 															await fetchOrders();
-															toast.success('Pedido finalizado!');
+															showSuccessToast('Pedido finalizado!');
 														} catch (error: any) {
-															toast.error(error.message || 'Falha ao finalizar pedido');
+															showErrorToast(error.message || 'Falha ao finalizar pedido');
 														}
 													}}
 													className="bg-green-50 border-green-600 text-green-700 hover:bg-green-100 hover:border-green-700 hover:text-green-800">
@@ -694,9 +935,9 @@ export default function OrdersPage() {
 														try {
 															await updateOrderStatus(o.id, 'canceled');
 															await fetchOrders();
-															toast.success('Pedido cancelado!');
+															showSuccessToast('Pedido cancelado!');
 														} catch (error: any) {
-															toast.error(error.message || 'Falha ao cancelar pedido');
+															showErrorToast(error.message || 'Falha ao cancelar pedido');
 														}
 													}}
 													className="bg-orange-50 border-orange-600 text-orange-700 hover:bg-orange-100 hover:border-orange-700 hover:text-orange-800">
@@ -712,6 +953,15 @@ export default function OrdersPage() {
 					})}
 				</div>
 			)}
-		</div>
+			{/* Hidden print template */}
+			{orderToPrint && (
+				<div style={{ display: 'none' }}>
+					<OrderLabelsTemplate
+						ref={printRef}
+						order={orderToPrint}
+						customerName={getCustomerName(orderToPrint)}
+					/>
+				</div>
+			)}	</div>
 	);
 }

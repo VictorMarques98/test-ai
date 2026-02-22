@@ -1,14 +1,14 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useRestaurantStore } from "@/store/restaurantStoreApi";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Package, UtensilsCrossed, ClipboardList, AlertTriangle, ArrowRight, Plus, Users } from "lucide-react";
+import { useRestaurantStore } from "@/store/restaurantStoreApi";
+import { ArrowRight, ClipboardList, Package, Plus, Users, UtensilsCrossed } from "lucide-react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function DashboardPage() {
 	const navigate = useNavigate();
-	const { products, orders, fetchProducts, fetchOrders } = useRestaurantStore();
+	const { orders, fetchProducts, fetchOrders } = useRestaurantStore();
 	const pendingOrders = orders.filter((o) => o.status === "request" || o.status === "in_progress");
 
 	// Fetch data on mount
@@ -21,32 +21,11 @@ export default function DashboardPage() {
 		});
 	}, [fetchProducts, fetchOrders]);
 
-	const stats = [
-		{ label: "Produtos", value: products.length, icon: Package, color: "text-primary" },
-		{ label: "Pedidos", value: orders.length, icon: ClipboardList, color: "text-primary" },
-	];
-
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-3xl font-bold">Bem vindo!</h1>
-				<p className="text-muted-foreground mt-1">Visão geral</p>
-			</div>
-
-			<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-				{stats.map((s) => (
-					<Card key={s.label}>
-						<CardContent className="pt-6">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm text-muted-foreground">{s.label}</p>
-									<p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
-								</div>
-								<s.icon className={`w-8 h-8 ${s.color} opacity-60`} />
-							</div>
-						</CardContent>
-					</Card>
-				))}
+				<h1 className="text-3xl font-bold">Bem vinda!</h1>
+				<p className="text-muted-foreground mt-1">Visão geral do sistema</p>
 			</div>
 
 			<Card>
@@ -62,21 +41,28 @@ export default function DashboardPage() {
 							className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary/5 hover:border-primary hover:text-primary"
 							onClick={() => navigate("/orders", { state: { openModal: true } })}>
 							<ClipboardList className="w-6 h-6" />
-							<span className="text-sm font-medium">Novo Pedido</span>
+							<span className="text-sm font-medium">Criar Pedido</span>
 						</Button>
 						<Button
 							variant="outline"
 							className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary/5 hover:border-primary hover:text-primary"
 							onClick={() => navigate("/inventory", { state: { openModal: true } })}>
 							<Package className="w-6 h-6" />
-							<span className="text-sm font-medium">Novo Produto</span>
+							<span className="text-sm font-medium">Criar Prato</span>
+						</Button>
+						<Button
+							variant="outline"
+							className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary/5 hover:border-primary hover:text-primary"
+							onClick={() => navigate("/items", { state: { openModal: true } })}>
+							<UtensilsCrossed className="w-6 h-6" />
+							<span className="text-sm font-medium">Adicionar Ingrediente</span>
 						</Button>
 						<Button
 							variant="outline"
 							className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary/5 hover:border-primary hover:text-primary"
 							onClick={() => navigate("/clients", { state: { openModal: true } })}>
 							<Users className="w-6 h-6" />
-							<span className="text-sm font-medium">Novo Cliente</span>
+							<span className="text-sm font-medium">Adicionar Cliente</span>
 						</Button>
 
 					</div>

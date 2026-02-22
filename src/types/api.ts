@@ -35,6 +35,7 @@ export interface CreateProductDto {
   description?: string | null;
   price?: number; // Selling price
   buyPrice?: number; // Purchase/cost price
+  is_additional?: boolean; // Whether this product is an additional (e.g. extra)
   items: ProductItemDto[];
 }
 
@@ -43,6 +44,7 @@ export interface UpdateProductDto {
   description?: string | null;
   price?: number;
   buyPrice?: number;
+  is_additional?: boolean; // Whether this product is an additional (e.g. extra)
   items?: ProductItemDto[];
 }
 
@@ -60,6 +62,7 @@ export interface Product {
   description?: string | null;
   price?: number;
   buyPrice?: number;
+  is_additional?: boolean; // Whether this product is an additional (e.g. extra)
   created_at?: string;
   updated_at?: string;
   product_items?: ProductItem[];
@@ -69,12 +72,15 @@ export interface Product {
 export interface CreateStockDto {
   itemId: string;
   quantity: number;
+  purchase_price: number; // Purchase/cost value for the stock being added
   alert_quantity?: number | null;
 }
 
 export interface UpdateStockDto {
-  quantity: number; // Replaces current stock quantity
-  alert_quantity?: number | null;
+  operation: "add" | "remove"; // Operation type
+  quantity: number; // Amount to add or remove (always positive)
+  purchase_price?: number; // Purchase/cost value (when adding stock)
+  alert_quantity?: number | null; // Optional: update alert threshold
 }
 
 export interface Stock {
@@ -94,6 +100,7 @@ export type OrderStatus = 'request' | 'in_progress' | 'refuse' | 'canceled' | 'f
 
 export interface CreateOrderDto {
   customerId?: string | null; // UUID reference to customer
+  forced_total?: number; // If provided, this value is used as the order total instead of calculating from product prices
   notes?: string | null;
   products: string[]; // Array of product IDs
 }
@@ -111,11 +118,32 @@ export interface OrderItem {
   item?: Item;
 }
 
+export interface OrderProduct {
+  id: string;
+  name: string;
+  description?: string | null;
+  price: string;
+  buy_price: string;
+  quantity: string;
+  total: string;
+  created_at: string;
+  updated_at: string;
+  items?: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+    unit_type: UnitType;
+    quantity: string;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
 export interface Order {
   id: string;
   customerId?: string | null; // UUID reference to customer
   notes?: string | null;
-  products?: string[]; // Array of product UUIDs (backend may include this)
+  products?: OrderProduct[]; // Array of embedded product objects
   status: OrderStatus;
   created_at: string;
   updated_at?: string;
