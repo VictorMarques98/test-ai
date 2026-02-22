@@ -78,6 +78,7 @@ export interface StockHistoryEntry {
 	quantity: number;
 	operation: "add" | "remove";
 	item_name: string;
+	purchase_price?: number;
 	created_at: string;
 }
 

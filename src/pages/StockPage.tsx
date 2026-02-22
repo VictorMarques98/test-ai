@@ -1,44 +1,43 @@
-import { useState, useEffect, useMemo } from "react";
-import { useRestaurantStore } from "@/store/restaurantStoreApi";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-	Package, 
-	Plus, 
-	Minus,
-	Loader2, 
-	Search, 
-	Filter, 
-	XCircle,
+import { useRestaurantStore } from "@/store/restaurantStoreApi";
+import type { UnitType } from "@/types/api";
+import {
+	AlertCircle,
+	ArrowDownCircle,
+	ArrowUpCircle,
 	ChevronDown,
 	ChevronRight,
-	AlertCircle,
-	TrendingUp,
-	TrendingDown,
-	History,
 	Edit,
-	ArrowUpCircle,
-	ArrowDownCircle,
-	PackagePlus
+	Filter,
+	History,
+	Loader2,
+	Minus,
+	Package,
+	Plus,
+	Search,
+	TrendingDown,
+	TrendingUp,
+	XCircle
 } from "lucide-react";
-import { toast } from "sonner";
-import type { UnitType } from "@/types/api";
+import { useEffect, useMemo, useState } from "react";
+import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 
 // Helper function to get unit display information
 const getUnitDisplay = (unitType: UnitType) => {
 	const displays = {
-		grams: { label: '📏 Gramas', abbr: 'g', decimals: 2 },
-		kg: { label: '⚖️ Quilogramas', abbr: 'kg', decimals: 2 },
-		ml: { label: '💧 Mililitros', abbr: 'ml', decimals: 2 },
-		liters: { label: '🍶 Litros', abbr: 'L', decimals: 2 },
-		unit: { label: '🔢 Unidade', abbr: 'un', decimals: 0 }
+		grams: { label: 'Gramas', abbr: 'g', decimals: 2, color: 'bg-blue-500/10 text-blue-600 dark:text-blue-500 border-blue-200 dark:border-blue-800' },
+		kg: { label: 'Quilogramas', abbr: 'kg', decimals: 2, color: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-500 border-indigo-200 dark:border-indigo-800' },
+		ml: { label: 'Mililitros', abbr: 'ml', decimals: 2, color: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-500 border-cyan-200 dark:border-cyan-800' },
+		liters: { label: 'Litros', abbr: 'L', decimals: 2, color: 'bg-teal-500/10 text-teal-600 dark:text-teal-500 border-teal-200 dark:border-teal-800' },
+		unit: { label: 'Unidade', abbr: 'un', decimals: 0, color: 'bg-purple-500/10 text-purple-600 dark:text-purple-500 border-purple-200 dark:border-purple-800' }
 	};
 	return displays[unitType];
 };
@@ -53,13 +52,11 @@ export default function StockPage() {
 		fetchItems,
 		fetchStock,
 		fetchStockHistory,
-		createStock,
 		updateStock,
 		updateItem,
 		clearError 
 	} = useRestaurantStore();
 	
-	const [open, setOpen] = useState(false);
 	const [operationOpen, setOperationOpen] = useState(false);
 	const [editOpen, setEditOpen] = useState(false);
 	const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
@@ -118,57 +115,14 @@ export default function StockPage() {
 		});
 	};
 
-	const handleCreateStock = async () => {
-		if (!form.itemId || !form.quantity || !form.purchase_price) {
-			toast.error('Por favor, preencha todos os campos obrigatórios');
-			return;
-		}
-
-		const quantity = parseFloat(form.quantity);
-		const purchasePrice = parseFloat(form.purchase_price);
-		const alertQty = form.alert_quantity ? parseFloat(form.alert_quantity) : null;
-
-		if (isNaN(quantity) || quantity < 0.01) {
-			toast.error('Quantidade deve ser maior que 0');
-			return;
-		}
-
-		if (isNaN(purchasePrice) || purchasePrice < 0) {
-			toast.error('Preço de compra inválido');
-			return;
-		}
-
-		if (alertQty !== null && (isNaN(alertQty) || alertQty < 0)) {
-			toast.error('Quantidade de alerta inválida');
-			return;
-		}
-
-		try {
-			await createStock({
-				itemId: form.itemId,
-				quantity: quantity,
-				purchase_price: purchasePrice,
-				alert_quantity: alertQty
-			});
-			
-			toast.success('Estoque criado com sucesso!');
-			resetForm();
-			setOpen(false);
-			await Promise.all([fetchStock(), fetchStockHistory()]);
-		} catch (err: any) {
-			console.error('Failed to create stock:', err);
-			toast.error(err.message || 'Erro ao criar estoque');
-		}
-	};
-
 	const handleStockOperation = async () => {
 		if (!selectedStockId || !form.operationQuantity) {
-			toast.error('Por favor, informe a quantidade');
+			showErrorToast('Por favor, informe a quantidade');
 			return;
 		}
 
 		if (operation === 'add' && !form.operationPurchasePrice) {
-			toast.error('Por favor, informe o preço de compra');
+			showErrorToast('Por favor, informe o preço de compra');
 			return;
 		}
 
@@ -177,12 +131,12 @@ export default function StockPage() {
 		const purchasePrice = form.operationPurchasePrice ? parseFloat(form.operationPurchasePrice) : undefined;
 
 		if (isNaN(quantity) || quantity < 0.01) {
-			toast.error('Quantidade deve ser maior que 0');
+			showErrorToast('Quantidade deve ser maior que 0');
 			return;
 		}
 
 		if (operation === 'add' && purchasePrice !== undefined && (isNaN(purchasePrice) || purchasePrice < 0)) {
-			toast.error('Preço de compra inválido');
+			showErrorToast('Preço de compra inválido');
 			return;
 		}
 
@@ -194,14 +148,14 @@ export default function StockPage() {
 				alert_quantity: alertQty
 			} as any);
 			
-			toast.success(`Estoque ${operation === 'add' ? 'adicionado' : 'removido'} com sucesso!`);
+			showSuccessToast(`Estoque ${operation === 'add' ? 'adicionado' : 'removido'} com sucesso!`);
 			resetForm();
 			setOperationOpen(false);
 			setSelectedStockId(null);
 			await Promise.all([fetchStock(), fetchStockHistory()]);
 		} catch (err: any) {
 			console.error('Failed to update stock:', err);
-			toast.error(err.message || 'Erro ao atualizar estoque');
+			showErrorToast(err.message || 'Erro ao atualizar estoque');
 		}
 	};
 
@@ -230,26 +184,26 @@ export default function StockPage() {
 
 	const handleEdit = async () => {
 		if (!selectedStockId) {
-			toast.error('Nenhum estoque selecionado');
+			showErrorToast('Nenhum estoque selecionado');
 			return;
 		}
 
 		if (!form.editName.trim()) {
-			toast.error('Nome é obrigatório');
+			showErrorToast('Nome é obrigatório');
 			return;
 		}
 
 		const alertQty = form.editAlertQuantity ? parseFloat(form.editAlertQuantity) : null;
 
 		if (form.editAlertQuantity && (alertQty === null || isNaN(alertQty) || alertQty < 0)) {
-			toast.error('Quantidade de alerta inválida');
+			showErrorToast('Quantidade de alerta inválida');
 			return;
 		}
 
 		try {
 			const currentStock = stock.find(s => s.id === selectedStockId);
 			if (!currentStock) {
-				toast.error('Estoque não encontrado');
+				showErrorToast('Estoque não encontrado');
 				return;
 			}
 
@@ -266,22 +220,16 @@ export default function StockPage() {
 				alert_quantity: alertQty
 			});
 			
-			toast.success('Ingrediente atualizado com sucesso!');
+			showSuccessToast('Ingrediente atualizado com sucesso!');
 			resetForm();
 			setEditOpen(false);
 			setSelectedStockId(null);
 			await Promise.all([fetchItems(), fetchStock()]);
 		} catch (err: any) {
 			console.error('Failed to update item:', err);
-			toast.error(err.message || 'Erro ao atualizar item');
+			showErrorToast(err.message || 'Erro ao atualizar item');
 		}
 	};
-
-	// Get items that don't have stock yet
-	const itemsWithoutStock = useMemo(() => {
-		const stockItemIds = new Set(stock.map(s => s.item_id));
-		return items.filter(item => !stockItemIds.has(item.id));
-	}, [items, stock]);
 
 	// Join stock with item data
 	const stockWithItems = useMemo(() => {
@@ -586,7 +534,7 @@ export default function StockPage() {
 									<Button
 										variant="ghost"
 										onClick={() => setFiltersExpanded(!filtersExpanded)}
-										className="flex items-center gap-2 hover:bg-muted"
+										className="flex items-center gap-2"
 									>
 										<Filter className="w-4 h-4" />
 										<span className="font-medium">Filtros</span>
@@ -713,6 +661,7 @@ export default function StockPage() {
 											<TableHead className="font-bold">Situação</TableHead>
 											<TableHead className="font-bold">Ingrediente</TableHead>
 											<TableHead className="font-bold">Descrição</TableHead>
+											<TableHead className="font-bold">Tipo de Unidade</TableHead>
 											<TableHead className="font-bold text-right">Disponível</TableHead>
 											<TableHead className="font-bold text-right">Reservado</TableHead>
 											<TableHead className="font-bold text-right">Alerta</TableHead>
@@ -745,6 +694,11 @@ export default function StockPage() {
 															{s.item!.description || (
 																<span className="text-muted-foreground/50 italic">Sem descrição</span>
 															)}
+														</TableCell>
+														<TableCell>
+															<Badge className={`${unitDisplay.color} border font-semibold`}>
+																{unitDisplay.label}
+															</Badge>
 														</TableCell>
 														<TableCell className="text-right">
 															<span className="font-semibold text-green-600 dark:text-green-500">
@@ -848,11 +802,16 @@ export default function StockPage() {
 												<TableHead className="font-bold">Ingrediente</TableHead>
 												<TableHead className="font-bold">Operação</TableHead>
 												<TableHead className="font-bold">Quantidade</TableHead>
-												<TableHead className="font-bold">ID</TableHead>
+												<TableHead className="font-bold text-right">Preço de Compra</TableHead>
 											</TableRow>
 										</TableHeader>
 										<TableBody>
-											{stockHistory.map((entry) => (
+											{stockHistory.map((entry) => {
+												const stockEntry = stock.find(s => s.id === entry.stock_id);
+												const unitType = stockEntry?.item?.unit_type || 'unit';
+												const unitDisplay = getUnitDisplay(unitType as UnitType);
+												
+												return (
 												<TableRow key={entry.id} className="hover:bg-muted/30">
 													<TableCell className="font-medium">
 														{new Date(entry.created_at).toLocaleString('pt-BR', {
@@ -881,15 +840,25 @@ export default function StockPage() {
 													</TableCell>
 													<TableCell className="font-mono">
 														{Number(entry.quantity).toLocaleString('pt-BR', {
-															minimumFractionDigits: 2,
-															maximumFractionDigits: 2
-														})}
+															minimumFractionDigits: unitDisplay.decimals,
+															maximumFractionDigits: unitDisplay.decimals
+														})} {unitDisplay.abbr}
 													</TableCell>
-													<TableCell className="font-mono text-xs text-muted-foreground">
-														{entry.id.slice(0, 8)}...
+													<TableCell className="text-right">
+														{entry.operation === 'add' && entry.purchase_price !== null && entry.purchase_price !== undefined ? (
+															<span className="font-semibold text-green-600 dark:text-green-500">
+																R$ {Number(entry.purchase_price).toLocaleString('pt-BR', {
+																	minimumFractionDigits: 2,
+																	maximumFractionDigits: 2
+																})}
+															</span>
+														) : (
+															<span className="text-muted-foreground/50">-</span>
+														)}
 													</TableCell>
+													
 												</TableRow>
-											))}
+											)})}
 										</TableBody>
 									</Table>
 								</div>
