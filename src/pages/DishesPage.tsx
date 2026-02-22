@@ -257,7 +257,7 @@ export default function DishesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">
-                      Preço de Venda
+                      Preço unitário
                     </label>
                     <Input
                       type="number"

@@ -198,11 +198,75 @@ export default function OrdersPage() {
 	const getProductName = (id: string) => products.find((p) => p.id === id)?.name || "Desconhecido";
 	const getProductPrice = (id: string) => products.find((p) => p.id === id)?.price || 0;
 
-	const calculateOrderTotal = (orderProducts: string[]) => {
+	const calculateOriginalPrice = (orderProducts: string[]) => {
 		return orderProducts.reduce((total, productId) => {
 			const product = products.find((p) => p.id === productId);
 			return total + (Number(product?.price) || 0);
 		}, 0);
+	};
+
+	const calculateOrderTotal = (orderProducts: string[]) => {
+		// Count non-additional products to determine discount tier
+		const nonAdditionalCount = orderProducts.filter(productId => {
+			const product = products.find((p) => p.id === productId);
+			return !product?.is_additional;
+		}).length;
+		
+		// Determine discount per product based on quantity
+		let discount = 0;
+		if (nonAdditionalCount >= 10) {
+			discount = 5;
+		} else if (nonAdditionalCount >= 5) {
+			discount = 3;
+		}
+		
+		// Calculate total with discount applied only to non-additional products
+		return orderProducts.reduce((total, productId) => {
+			const product = products.find((p) => p.id === productId);
+			const price = Number(product?.price) || 0;
+			
+			// Apply discount only to non-additional products
+			if (product?.is_additional) {
+				return total + price;
+			} else {
+				return total + Math.max(0, price - discount);
+			}
+		}, 0);
+	};
+
+	const getDiscountInfo = () => {
+		if (selectedProducts.length === 0) return null;
+		
+		const productsArray: string[] = [];
+		selectedProducts.forEach(item => {
+			for (let i = 0; i < item.quantity; i++) {
+				productsArray.push(item.productId);
+			}
+		});
+
+		const nonAdditionalCount = productsArray.filter(productId => {
+			const product = products.find((p) => p.id === productId);
+			return !product?.is_additional;
+		}).length;
+
+		let discountPerProduct = 0;
+		if (nonAdditionalCount >= 10) {
+			discountPerProduct = 5;
+		} else if (nonAdditionalCount >= 5) {
+			discountPerProduct = 3;
+		}
+
+		const originalPrice = calculateOriginalPrice(productsArray);
+		const discountedPrice = calculateOrderTotal(productsArray);
+		const totalDiscount = originalPrice - discountedPrice;
+
+		return {
+			originalPrice,
+			discountedPrice,
+			totalDiscount,
+			discountPerProduct,
+			nonAdditionalCount
+		};
 	};
 
 	const getCustomerName = (order: any) => {
@@ -374,40 +438,47 @@ export default function OrdersPage() {
 								</div>
 								<div className="space-y-2">
 									{selectedProducts.length > 0 && (
-										<div className="grid grid-cols-[1fr_auto_auto] gap-2 px-2">
+										<div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-2">
 											<span className="text-xs font-medium text-muted-foreground">Produto</span>
+											<span className="text-xs font-medium text-muted-foreground w-24">Preço</span>
 											<span className="text-xs font-medium text-muted-foreground w-20">Qtd</span>
 											<span className="w-10"></span>
 										</div>
 									)}
-									{selectedProducts.map((item, idx) => (
-										<div key={idx} className="flex items-center gap-2">
-											<Select
-												value={item.productId}
-												onValueChange={(v) => updateItem(idx, "productId", v)}>
-												<SelectTrigger className="flex-1">
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													{products.map((p) => (
-														<SelectItem key={p.id} value={p.id}>
-															{p.name} {p.price ? `- $${Number(p.price).toFixed(2)}` : ''}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-											<Input
-												type="number"
-												className="w-20"
-												min={1}
-												value={item.quantity}
-												onChange={(e) => updateItem(idx, "quantity", e.target.value)}
-											/>
-											<Button variant="ghost" size="icon" onClick={() => removeItem(idx)}>
-												<X className="w-3 h-3" />
-											</Button>
-										</div>
-									))}
+									{selectedProducts.map((item, idx) => {
+										const selectedProduct = products.find(p => p.id === item.productId);
+										return (
+											<div key={idx} className="flex items-center gap-2">
+												<Select
+													value={item.productId}
+													onValueChange={(v) => updateItem(idx, "productId", v)}>
+													<SelectTrigger className="flex-1">
+														<SelectValue />
+													</SelectTrigger>
+													<SelectContent>
+														{products.map((p) => (
+															<SelectItem key={p.id} value={p.id}>
+																{p.name}
+															</SelectItem>
+														))}
+													</SelectContent>
+												</Select>
+												<div className="w-24 text-sm font-semibold text-muted-foreground text-left">
+													{selectedProduct?.price ? `$${Number(selectedProduct.price).toFixed(2)}` : '-'}
+												</div>
+												<Input
+													type="number"
+													className="w-20"
+													min={1}
+													value={item.quantity}
+													onChange={(e) => updateItem(idx, "quantity", e.target.value)}
+												/>
+												<Button variant="ghost" size="icon" onClick={() => removeItem(idx)}>
+													<X className="w-3 h-3" />
+												</Button>
+											</div>
+										);
+									})}
 									{selectedProducts.length === 0 && (
 										<div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-center gap-2">
 											<AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -418,29 +489,47 @@ export default function OrdersPage() {
 									)}
 								</div>
 
-								{selectedProducts.length > 0 && (
-								<div className="space-y-2">
-									<div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
-										<div className="flex flex-1 flex-row justify-between gap-3 items-center">
-											<label className="text-lg font-semibold text-slate-700 dark:text-slate-300 block">
-												Total do Pedido ($):
-											</label>
-											<Input
-												type="number"
-												placeholder="0.00"
-												step="0.01"
-												min="0"
-												value={forcedTotal}
-												onChange={(e) => setForcedTotal(e.target.value)}
-												className="text-lg font-bold text-primary h-12 w-max"
-											/>
+{selectedProducts.length > 0 && (() => {
+						const discountInfo = getDiscountInfo();
+						return (
+							<div className="space-y-2">
+								{discountInfo && discountInfo.totalDiscount > 0 && (
+									<div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 space-y-1">
+										<div className="flex items-center gap-2">
+											<CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
+											<p className="text-sm font-semibold text-green-800 dark:text-green-300">
+												Desconto Aplicado!
+											</p>
+										</div>
+										<div className="text-xs text-green-700 dark:text-green-400 space-y-0.5 ml-6">
+											<p>Preço original: <span className="line-through">${discountInfo.originalPrice.toFixed(2)}</span></p>
+											<p>Desconto: ${discountInfo.discountPerProduct.toFixed(2)} por produto ({discountInfo.nonAdditionalCount} produtos não adicionais)</p>
+											<p className="font-semibold">Economia total: ${discountInfo.totalDiscount.toFixed(2)}</p>
 										</div>
 									</div>
-									<p className="text-xs text-muted-foreground">
-										Valor calculado automaticamente. Você pode editar se necessário.
-									</p>
-								</div>
 								)}
+								<div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
+									<div className="flex flex-1 flex-row justify-between gap-3 items-center">
+										<label className="text-lg font-semibold text-slate-700 dark:text-slate-300 block">
+											Total do Pedido ($):
+										</label>
+										<Input
+											type="number"
+											placeholder="0.00"
+											step="0.01"
+											min="0"
+											value={forcedTotal}
+											onChange={(e) => setForcedTotal(e.target.value)}
+											className="text-lg font-bold text-primary h-12 w-max"
+										/>
+									</div>
+								</div>
+								<p className="text-xs text-muted-foreground">
+									Valor calculado automaticamente. Você pode editar se necessário.
+								</p>
+							</div>
+						);
+					})()}
 
 								<Button 
 									className="w-full" 
