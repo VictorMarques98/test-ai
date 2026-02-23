@@ -144,23 +144,8 @@
 - Backend requires authentication
 
 **Solutions:**
-1. **Add auth token to API client**
-   Edit `src/lib/api.ts`:
-   ```typescript
-   apiClient.interceptors.request.use((config) => {
-     const token = localStorage.getItem('auth_token');
-     if (token) {
-       config.headers.Authorization = `Bearer ${token}`;
-     }
-     return config;
-   });
-   ```
-
-2. **Store token after login**
-   ```typescript
-   // After successful login
-   localStorage.setItem('auth_token', response.data.token);
-   ```
+1. **Log in** at `/auth/login` (route `#/auth/login`). The app stores the access and refresh tokens and sends the access token on every request.
+2. If you see 401 after being logged in, the app will try to refresh the token via `POST /auth/refresh`. If refresh fails, you will be redirected to the login page—log in again.
 
 ---
 

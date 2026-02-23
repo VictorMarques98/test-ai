@@ -5,9 +5,8 @@
 Your InventoryPage is now fully integrated with the backend API!
 
 ### 1. **API Configuration**
-- ✅ Added API key to `.env`: `VITE_API_KEY`
-- ✅ Updated `src/lib/api.ts` to automatically add Bearer token to all requests
-- ✅ Updated `.env.example` with API key placeholder
+- ✅ Authentication via login: use `/auth/login` to obtain `accessToken` and `refreshToken`; the app uses the access token for all requests and refreshes it automatically via `/auth/refresh`
+- ✅ Updated `src/lib/api.ts` to add Bearer token from auth store and handle token refresh on 401
 
 ### 2. **InventoryPage Refactored**
 - ✅ Changed from `restaurantStore` → `restaurantStoreApi` (API-based)

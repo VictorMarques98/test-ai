@@ -7,10 +7,11 @@ This document provides a comprehensive overview of all backend API endpoints ava
 - **Production**: Set via `VITE_API_BASE_URL` environment variable
 
 ## Authentication
-All endpoints require Bearer token authentication using API key:
+All endpoints require Bearer token authentication. After logging in at `POST /auth/login` (email + password), use the returned `accessToken` in the header:
 ```
-Authorization: Bearer YOUR_API_KEY
+Authorization: Bearer <accessToken>
 ```
+The app automatically refreshes the token via `POST /auth/refresh` when it expires (15 min).
 
 ---
 

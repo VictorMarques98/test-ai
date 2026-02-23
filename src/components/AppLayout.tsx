@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -8,25 +8,35 @@ import {
   BarChart3,
   Box,
   PackageOpen,
+  LogOut,
 } from "lucide-react";
-import LowStockBanner from "./LowStockBanner";
+import { useAuthStore } from "@/store/authStore";
+import { Button } from "@/components/ui/button";
 
 const links = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/items", label: "Ingredientes", icon: Box },
-  { to: "/stock", label: "Estoque", icon: PackageOpen },
   { to: "/dishes", label: "Cardápio", icon: UtensilsCrossed },
   { to: "/orders", label: "Pedidos", icon: ClipboardList },
+  { to: "/stock", label: "Estoque", icon: PackageOpen },
   { to: "/clients", label: "Clientes", icon: Users },
   { to: "/reports", label: "Relatórios", icon: BarChart3, disabled: true },
 ];
 
 export default function AppLayout() {
+  const navigate = useNavigate();
+  const clearTokens = useAuthStore((s) => s.clearTokens);
+
+  const handleLogout = () => {
+    clearTokens();
+    navigate("/auth/login", { replace: true });
+  };
+
   return (
     <div className="flex min-h-screen">
       <aside className="w-64 bg-card border-r border-border p-6 hidden md:flex flex-col">
-        <div className="mb-6">
-          <img src="/logo.png" alt="Thaina Pty" className="w-full h-auto max-w-36" />
+        <div className="mb-6 flex justify-center">
+          <img src="/logo.png" alt="Thaina Pty" className="h-auto max-w-36" />
         </div>
         <nav className="space-y-1 flex-1">
           {links.map((l) => (
@@ -48,10 +58,18 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
+        <Button
+          variant="ghost"
+          className="mt-auto justify-start gap-3 text-muted-foreground hover:text-foreground"
+          onClick={handleLogout}
+        >
+          <LogOut className="w-4 h-4" />
+          Sair
+        </Button>
       </aside>
 
       {/* Mobile nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border flex md:hidden z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border flex md:hidden z-50 items-center">
         {links.map((l) => (
           <NavLink
             key={l.to}
@@ -67,6 +85,15 @@ export default function AppLayout() {
             {l.label}
           </NavLink>
         ))}
+        <button
+          type="button"
+          className="flex-1 flex flex-col items-center py-3 text-xs text-muted-foreground"
+          onClick={handleLogout}
+          aria-label="Sair"
+        >
+          <LogOut className="w-5 h-5 mb-1" />
+          Sair
+        </button>
       </div>
 
       <main className="flex-1 p-6 md:p-8 pb-24 md:pb-8 overflow-auto">
