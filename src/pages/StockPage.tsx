@@ -28,7 +28,33 @@ import {
 	XCircle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
+
+type OperationFormValues = {
+	operationQuantity: string;
+	operationPurchasePrice: string;
+	operationAlertQuantity: string;
+};
+
+type EditFormValues = {
+	editName: string;
+	editDescription: string;
+	editAlertQuantity: string;
+};
+
+const OPERATION_DEFAULT_VALUES: OperationFormValues = {
+	operationQuantity: "",
+	operationPurchasePrice: "",
+	operationAlertQuantity: "",
+};
+
+const EDIT_DEFAULT_VALUES: EditFormValues = {
+	editName: "",
+	editDescription: "",
+	editAlertQuantity: "",
+};
 
 // Helper function to get unit display information
 const getUnitDisplay = (unitType: UnitType) => {
@@ -61,18 +87,13 @@ export default function StockPage() {
 	const [editOpen, setEditOpen] = useState(false);
 	const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
 	const [operation, setOperation] = useState<"add" | "remove">("add");
-	const [form, setForm] = useState({ 
-		itemId: "",
-		quantity: "",
-		purchase_price: "",
-		alert_quantity: "",
-		operationQuantity: "",
-		operationPurchasePrice: "",
-		operationAlertQuantity: "",
-		editName: "",
-		editDescription: "",
-		editAlertQuantity: ""
-	});
+	const [confirmOperationDiscardOpen, setConfirmOperationDiscardOpen] = useState(false);
+	const [confirmEditDiscardOpen, setConfirmEditDiscardOpen] = useState(false);
+
+	const operationForm = useForm<OperationFormValues>({ defaultValues: OPERATION_DEFAULT_VALUES });
+	const editForm = useForm<EditFormValues>({ defaultValues: EDIT_DEFAULT_VALUES });
+	const isOperationDirty = operationForm.formState.isDirty;
+	const isEditDirty = editForm.formState.isDirty;
 
 	// Filter states
 	const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -100,85 +121,71 @@ export default function StockPage() {
 		}
 	}, [error, clearError]);
 
-	const resetForm = () => {
-		setForm({ 
-			itemId: "",
-			quantity: "",
-			purchase_price: "",
-			alert_quantity: "",
-			operationQuantity: "",
-			operationPurchasePrice: "",
-			operationAlertQuantity: "",
-			editName: "",
-			editDescription: "",
-			editAlertQuantity: ""
-		});
+	const resetOperationForm = () => {
+		operationForm.reset(OPERATION_DEFAULT_VALUES);
+	};
+	const resetEditForm = () => {
+		editForm.reset(EDIT_DEFAULT_VALUES);
 	};
 
 	const handleStockOperation = async () => {
-		if (!selectedStockId || !form.operationQuantity) {
+		const f = operationForm.getValues();
+		if (!selectedStockId || !f.operationQuantity) {
 			showErrorToast('Por favor, informe a quantidade');
 			return;
 		}
-
-		if (operation === 'add' && !form.operationPurchasePrice) {
+		if (operation === 'add' && !f.operationPurchasePrice) {
 			showErrorToast('Por favor, informe o preço de compra');
 			return;
 		}
-
-		const quantity = parseFloat(form.operationQuantity);
-		const alertQty = form.operationAlertQuantity ? parseFloat(form.operationAlertQuantity) : undefined;
-		const purchasePrice = form.operationPurchasePrice ? parseFloat(form.operationPurchasePrice) : undefined;
-
+		const quantity = parseFloat(f.operationQuantity);
+		const alertQty = f.operationAlertQuantity ? parseFloat(f.operationAlertQuantity) : undefined;
+		const purchasePrice = f.operationPurchasePrice ? parseFloat(f.operationPurchasePrice) : undefined;
 		if (isNaN(quantity) || quantity < 0.01) {
 			showErrorToast('Quantidade deve ser maior que 0');
 			return;
 		}
-
 		if (operation === 'add' && purchasePrice !== undefined && (isNaN(purchasePrice) || purchasePrice < 0)) {
 			showErrorToast('Preço de compra inválido');
 			return;
 		}
-
 		try {
 			await updateStock(selectedStockId, {
 				operation,
-				quantity: quantity,
+				quantity,
 				purchase_price: operation === 'add' ? purchasePrice : undefined,
 				alert_quantity: alertQty
 			} as any);
-			
 			showSuccessToast(`Estoque ${operation === 'add' ? 'adicionado' : 'removido'} com sucesso!`);
-			resetForm();
+			resetOperationForm();
 			setOperationOpen(false);
 			setSelectedStockId(null);
 			await Promise.all([fetchStock(), fetchStockHistory()]);
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error('Failed to update stock:', err);
-			showErrorToast(err.message || 'Erro ao atualizar estoque');
+			showErrorToast((err as Error)?.message || 'Erro ao atualizar estoque');
 		}
 	};
 
 	const openOperation = (stockId: string, op: "add" | "remove") => {
 		setSelectedStockId(stockId);
 		setOperation(op);
+		operationForm.reset(OPERATION_DEFAULT_VALUES);
 		setOperationOpen(true);
 	};
 
 	const startEdit = (stockId: string) => {
 		const stockItem = stock.find(s => s.id === stockId);
 		if (!stockItem) return;
-		
 		const item = items.find(i => i.id === stockItem.item_id);
 		if (!item) return;
-		
+		const editAlertQuantity = stockItem.alert_quantity !== null ? Number(stockItem.alert_quantity).toFixed(2) : "";
 		setSelectedStockId(stockId);
-		setForm(prev => ({
-			...prev,
+		editForm.reset({
 			editName: item.name,
 			editDescription: item.description || "",
-			editAlertQuantity: stockItem.alert_quantity !== null ? Number(stockItem.alert_quantity).toFixed(2) : ""
-		}));
+			editAlertQuantity,
+		});
 		setEditOpen(true);
 	};
 
@@ -187,48 +194,81 @@ export default function StockPage() {
 			showErrorToast('Nenhum estoque selecionado');
 			return;
 		}
-
-		if (!form.editName.trim()) {
+		const f = editForm.getValues();
+		if (!f.editName.trim()) {
 			showErrorToast('Nome é obrigatório');
 			return;
 		}
-
-		const alertQty = form.editAlertQuantity ? parseFloat(form.editAlertQuantity) : null;
-
-		if (form.editAlertQuantity && (alertQty === null || isNaN(alertQty) || alertQty < 0)) {
+		const alertQty = f.editAlertQuantity ? parseFloat(f.editAlertQuantity) : null;
+		if (f.editAlertQuantity && (alertQty === null || isNaN(alertQty) || alertQty < 0)) {
 			showErrorToast('Quantidade de alerta inválida');
 			return;
 		}
-
 		try {
 			const currentStock = stock.find(s => s.id === selectedStockId);
 			if (!currentStock) {
 				showErrorToast('Estoque não encontrado');
 				return;
 			}
-
-			// Update item (name and description)
 			await updateItem(currentStock.item_id, {
-				name: form.editName,
-				description: form.editDescription || null
+				name: f.editName,
+				description: f.editDescription || null
 			});
-
-			// Update stock (alert quantity)
 			await updateStock(selectedStockId, {
 				operation: 'add',
-				quantity: 0, // No quantity change, just updating alert
+				quantity: 0,
 				alert_quantity: alertQty
 			});
-			
 			showSuccessToast('Ingrediente atualizado com sucesso!');
-			resetForm();
+			resetEditForm();
 			setEditOpen(false);
 			setSelectedStockId(null);
 			await Promise.all([fetchItems(), fetchStock()]);
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error('Failed to update item:', err);
-			showErrorToast(err.message || 'Erro ao atualizar item');
+			showErrorToast((err as Error)?.message || 'Erro ao atualizar item');
 		}
+	};
+
+	const handleCloseOperationDialog = (v: boolean) => {
+		if (!v) {
+			if (isOperationDirty) setConfirmOperationDiscardOpen(true);
+			else {
+				setOperationOpen(false);
+				resetOperationForm();
+				setSelectedStockId(null);
+			}
+		} else {
+			setOperationOpen(v);
+			operationForm.reset(OPERATION_DEFAULT_VALUES);
+		}
+	};
+
+	const handleConfirmDiscardOperation = () => {
+		setOperationOpen(false);
+		resetOperationForm();
+		setSelectedStockId(null);
+		setConfirmOperationDiscardOpen(false);
+	};
+
+	const handleCloseEditDialog = (v: boolean) => {
+		if (!v) {
+			if (isEditDirty) setConfirmEditDiscardOpen(true);
+			else {
+				setEditOpen(false);
+				resetEditForm();
+				setSelectedStockId(null);
+			}
+		} else {
+			setEditOpen(v);
+		}
+	};
+
+	const handleConfirmDiscardEdit = () => {
+		setEditOpen(false);
+		resetEditForm();
+		setSelectedStockId(null);
+		setConfirmEditDiscardOpen(false);
 	};
 
 	// Join stock with item data
@@ -321,16 +361,18 @@ export default function StockPage() {
 				</div>
 			</div>
 
+			<ConfirmDiscardDialog
+				open={confirmOperationDiscardOpen}
+				onOpenChange={setConfirmOperationDiscardOpen}
+				onConfirm={handleConfirmDiscardOperation}
+			/>
+			<ConfirmDiscardDialog
+				open={confirmEditDiscardOpen}
+				onOpenChange={setConfirmEditDiscardOpen}
+				onConfirm={handleConfirmDiscardEdit}
+			/>
 			{/* Stock Operation Dialog */}
-			<Dialog
-				open={operationOpen}
-				onOpenChange={(v) => {
-					setOperationOpen(v);
-					if (!v) {
-						resetForm();
-						setSelectedStockId(null);
-					}
-				}}>
+			<Dialog open={operationOpen} onOpenChange={handleCloseOperationDialog}>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>
@@ -353,12 +395,11 @@ export default function StockPage() {
 							<Input
 								type="number"
 								placeholder={operation === 'add' ? "Quantidade a adicionar" : "Quantidade a remover"}
-								value={form.operationQuantity}
-								onChange={(e) => setForm({ ...form, operationQuantity: e.target.value })}
 								disabled={isLoading}
-							min="0.01"
+								min="0.01"
 								step="0.01"
 								autoFocus
+								{...operationForm.register("operationQuantity")}
 							/>
 						</div>
 						{operation === 'add' && (
@@ -367,11 +408,10 @@ export default function StockPage() {
 								<Input
 									type="number"
 									placeholder="Ex: 25.50"
-									value={form.operationPurchasePrice}
-									onChange={(e) => setForm({ ...form, operationPurchasePrice: e.target.value })}
 									disabled={isLoading}
 									min="0"
 									step="0.01"
+									{...operationForm.register("operationPurchasePrice")}
 								/>
 								<p className="text-xs text-muted-foreground">
 									Valor de custo/compra deste reabastecimento
@@ -383,11 +423,10 @@ export default function StockPage() {
 							<Input
 								type="number"
 								placeholder="Nova quantidade de alerta"
-								value={form.operationAlertQuantity}
-								onChange={(e) => setForm({ ...form, operationAlertQuantity: e.target.value })}
 								disabled={isLoading}
 								min="0"
 								step="0.01"
+								{...operationForm.register("operationAlertQuantity")}
 							/>
 						</div>
 						
@@ -405,15 +444,7 @@ export default function StockPage() {
 			</Dialog>
 
 			{/* Edit Stock Dialog */}
-			<Dialog
-				open={editOpen}
-				onOpenChange={(v) => {
-					setEditOpen(v);
-					if (!v) {
-						resetForm();
-						setSelectedStockId(null);
-					}
-				}}>
+			<Dialog open={editOpen} onOpenChange={handleCloseEditDialog}>
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>
@@ -428,10 +459,9 @@ export default function StockPage() {
 							<label className="text-sm font-medium">Nome do Ingrediente *</label>
 							<Input
 								placeholder="Ex: Tomate, Farinha, Ovos..."
-								value={form.editName}
-								onChange={(e) => setForm({ ...form, editName: e.target.value })}
 								disabled={isLoading}
 								autoFocus
+								{...editForm.register("editName")}
 							/>
 						</div>
 						<div className="space-y-1.5">
@@ -439,9 +469,8 @@ export default function StockPage() {
 							<textarea
 								className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 								placeholder="Descrição detalhada do item..."
-								value={form.editDescription}
-								onChange={(e) => setForm({ ...form, editDescription: e.target.value })}
 								disabled={isLoading}
+								{...editForm.register("editDescription")}
 							/>
 						</div>
 						<div className="space-y-1.5">
@@ -457,11 +486,10 @@ export default function StockPage() {
 							<Input
 								type="number"
 								placeholder="Ex: 10"
-								value={form.editAlertQuantity}
-								onChange={(e) => setForm({ ...form, editAlertQuantity: e.target.value })}
 								disabled={isLoading}
 								min="0"
 								step="0.01"
+								{...editForm.register("editAlertQuantity")}
 							/>
 							<p className="text-xs text-muted-foreground">
 								Deixe em branco para remover o alerta
@@ -471,7 +499,7 @@ export default function StockPage() {
 						<Button 
 							className="w-full" 
 							onClick={handleEdit}
-							disabled={isLoading}
+							disabled={isLoading || !isEditDirty}
 						>
 							{isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
 							Salvar Alterações

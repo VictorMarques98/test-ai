@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
+import { useForm } from "react-hook-form";
 import { useRestaurantStore } from "@/store/restaurantStoreApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import type { UnitType } from "@/types/api";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
 
 // Helper function to get unit display information
 const getUnitDisplay = (unitType: UnitType) => {
@@ -36,6 +38,24 @@ const getUnitDisplay = (unitType: UnitType) => {
 		unit: { label: 'Unidade', abbr: 'un', color: 'bg-purple-500/10 text-purple-600 dark:text-purple-500 border-purple-200 dark:border-purple-800' }
 	};
 	return displays[unitType];
+};
+
+type ItemFormValues = {
+	name: string;
+	description: string;
+	unit_type: UnitType | "";
+	quantity: string;
+	purchase_price: string;
+	alert_quantity: string;
+};
+
+const ITEM_DEFAULT_VALUES: ItemFormValues = {
+	name: "",
+	description: "",
+	unit_type: "",
+	quantity: "",
+	purchase_price: "",
+	alert_quantity: "",
 };
 
 export default function ItemsPage() {
@@ -55,14 +75,11 @@ export default function ItemsPage() {
 	
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
-	const [form, setForm] = useState({ 
-		name: "", 
-		description: "", 
-		unit_type: "" as UnitType | "",
-		quantity: "",
-		purchase_price: "",
-		alert_quantity: ""
-	});
+	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+
+	const form = useForm<ItemFormValues>({ defaultValues: ITEM_DEFAULT_VALUES });
+	const { formState, getValues, reset } = form;
+	const isDirty = formState.isDirty;
 
 	// Filter states
 	const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -96,86 +113,70 @@ export default function ItemsPage() {
 	}, [error, clearError]);
 
 	const resetForm = () => {
-		setForm({ 
-			name: "", 
-			description: "", 
-			unit_type: "" as "",
-			quantity: "",			purchase_price: "",			alert_quantity: ""
-		});
+		reset(ITEM_DEFAULT_VALUES);
 		setEditId(null);
 	};
 
 	const handleSubmit = async () => {
-		if (!form.name.trim() || !form.unit_type) {
+		const f = getValues();
+		if (!f.name.trim() || !f.unit_type) {
 			showErrorToast('Por favor, preencha os campos obrigatórios');
 			return;
 		}
-
-		// Validate quantity if creating new item
-		if (!editId && !form.quantity) {
+		if (!editId && !f.quantity) {
 			showErrorToast('Por favor, informe a quantidade inicial');
 			return;
 		}
-
-		const quantity = form.quantity ? parseFloat(form.quantity) : null;
-		const alertQty = form.alert_quantity ? parseFloat(form.alert_quantity) : null;
-
+		const quantity = f.quantity ? parseFloat(f.quantity) : null;
+		const alertQty = f.alert_quantity ? parseFloat(f.alert_quantity) : null;
 		if (!editId && (quantity === null || isNaN(quantity) || quantity < 0.01)) {
 			showErrorToast('Quantidade deve ser maior que 0');
 			return;
 		}
-
 		if (alertQty !== null && (isNaN(alertQty) || alertQty < 0)) {
 			showErrorToast('Quantidade de alerta inválida');
 			return;
 		}
-
 		try {
 			const itemData = {
-				name: form.name.trim(),
-				unit_type: form.unit_type,
-				description: form.description.trim() || undefined,
+				name: f.name.trim(),
+				unit_type: f.unit_type,
+				description: f.description.trim() || undefined,
 			};
-
 			if (editId) {
 				await updateItem(editId, itemData);
 				showSuccessToast('Ingrediente atualizado com sucesso!');
 			} else {
 				const newItem = await createItem(itemData);
-				
-				// Create stock for the new item
 				if (quantity !== null) {
-					const purchasePrice = form.purchase_price ? parseFloat(form.purchase_price) : 0;
-					
+					const purchasePrice = f.purchase_price ? parseFloat(f.purchase_price) : 0;
 					await createStock({
 						itemId: newItem.id,
-						quantity: quantity,
+						quantity,
 						purchase_price: purchasePrice,
 						alert_quantity: alertQty
 					});
 				}
-				
 				showSuccessToast('Ingrediente criado com sucesso!');
 			}
-			
 			resetForm();
 			setOpen(false);
 			await Promise.all([fetchItems(), fetchStock()]);
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error('Failed to save item:', err);
-			showErrorToast(err.message || 'Erro ao salvar item');
+			showErrorToast((err as Error)?.message || 'Erro ao salvar item');
 		}
 	};
 
-	const startEdit = (item: typeof items[0]) => {
+	const startEdit = (item: (typeof items)[0]) => {
 		setEditId(item.id);
-		setForm({
+		reset({
 			name: item.name,
 			description: item.description || "",
 			unit_type: item.unit_type,
 			quantity: "",
 			purchase_price: "",
-			alert_quantity: ""
+			alert_quantity: "",
 		});
 		setOpen(true);
 	};
@@ -218,6 +219,25 @@ export default function ItemsPage() {
 		setFilterUnitType("all");
 	};
 
+	const handleCloseItemDialog = (v: boolean) => {
+		if (!v) {
+			if (isDirty) setConfirmDiscardOpen(true);
+			else {
+				setOpen(false);
+				resetForm();
+			}
+		} else {
+			setOpen(v);
+			if (!editId) reset(ITEM_DEFAULT_VALUES);
+		}
+	};
+
+	const handleConfirmDiscardItem = () => {
+		setOpen(false);
+		resetForm();
+		setConfirmDiscardOpen(false);
+	};
+
 	return (
 		<div className="space-y-6">
 			{/* Header Section */}
@@ -234,12 +254,12 @@ export default function ItemsPage() {
 							</p>
 						</div>
 					</div>
-					<Dialog
-						open={open}
-						onOpenChange={(v) => {
-							setOpen(v);
-							if (!v) resetForm();
-						}}>
+					<ConfirmDiscardDialog
+						open={confirmDiscardOpen}
+						onOpenChange={setConfirmDiscardOpen}
+						onConfirm={handleConfirmDiscardItem}
+					/>
+					<Dialog open={open} onOpenChange={handleCloseItemDialog}>
 						<DialogTrigger asChild>
 							<Button size="lg" className="shadow-lg" disabled={isLoading}>
 								<Plus className="w-4 h-4 mr-2" />
@@ -255,9 +275,8 @@ export default function ItemsPage() {
 									<label className="text-sm font-medium">Nome do Ingrediente *</label>
 									<Input
 										placeholder="Ex: Tomate, Farinha, Ovos..."
-										value={form.name}
-										onChange={(e) => setForm({ ...form, name: e.target.value })}
 										disabled={isLoading}
+										{...form.register("name")}
 									/>
 								</div>
 								<div className="space-y-1.5">
@@ -265,9 +284,8 @@ export default function ItemsPage() {
 									<textarea
 										className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 										placeholder="Descrição detalhada do item..."
-										value={form.description}
-										onChange={(e) => setForm({ ...form, description: e.target.value })}
 										disabled={isLoading}
+										{...form.register("description")}
 									/>
 								</div>
 
@@ -279,18 +297,17 @@ export default function ItemsPage() {
 										<Input
 											type="number"
 											placeholder="Ex: 100"
-											value={form.quantity}
-											onChange={(e) => setForm({ ...form, quantity: e.target.value })}
 											disabled={isLoading}
 											min="0.01"
 											step="0.01"
+											{...form.register("quantity")}
 										/>
 									</div>
 									<div className="space-y-1.5">
 										<label className="text-sm font-medium">Tipo de Unidade *</label>
 										<Select 
-											value={form.unit_type} 
-											onValueChange={(v: UnitType) => setForm({ ...form, unit_type: v })}
+											value={form.watch("unit_type")} 
+											onValueChange={(v: UnitType) => form.setValue("unit_type", v, { shouldDirty: true })}
 											disabled={isLoading}
 										>
 											<SelectTrigger>
@@ -313,11 +330,10 @@ export default function ItemsPage() {
 										<Input
 											type="number"
 											placeholder="Ex: 25.50"
-											value={form.purchase_price}
-											onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
 											disabled={isLoading}
 											min="0"
 											step="0.01"
+											{...form.register("purchase_price")}
 										/>
 									</div>
 									<div className="space-y-1.5">
@@ -325,11 +341,10 @@ export default function ItemsPage() {
 										<Input
 											type="number"
 											placeholder="Ex: 10"
-											value={form.alert_quantity}
-											onChange={(e) => setForm({ ...form, alert_quantity: e.target.value })}
 											disabled={isLoading}
 											min="0"
 											step="0.01"
+											{...form.register("alert_quantity")}
 										/>
 									</div>
 								</div>
@@ -343,8 +358,8 @@ export default function ItemsPage() {
 							<div className="space-y-1.5">
 								<label className="text-sm font-medium">Tipo de Unidade</label>
 								<Select 
-									value={form.unit_type} 
-									onValueChange={(v: UnitType) => setForm({ ...form, unit_type: v })}
+									value={form.watch("unit_type")} 
+									onValueChange={() => {}}
 									disabled={true}
 								>
 									<SelectTrigger>
@@ -367,7 +382,7 @@ export default function ItemsPage() {
 				<Button 
 							className="w-full" 
 							onClick={handleSubmit}
-							disabled={isLoading}
+							disabled={isLoading || (!!editId && !isDirty)}
 						>
 							{isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
 							{editId ? "Atualizar Ingrediente" : "Adicionar Ingrediente"}

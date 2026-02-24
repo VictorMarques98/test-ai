@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useForm, useFieldArray } from "react-hook-form";
 import { useRestaurantStore } from "@/store/restaurantStoreApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,25 @@ import {
 } from "@/components/ui/select";
 import { ProductItemDto } from "@/types/api";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
+
+type DishFormValues = {
+  name: string;
+  description: string;
+  price: string;
+  buyPrice: string;
+  isAdditional: boolean;
+  items: ProductItemDto[];
+};
+
+const DEFAULT_VALUES: DishFormValues = {
+  name: "",
+  description: "",
+  price: "",
+  buyPrice: "",
+  isAdditional: false,
+  items: [],
+};
 
 export default function DishesPage() {
   const location = useLocation();
@@ -48,12 +68,17 @@ export default function DishesPage() {
   } = useRestaurantStore();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
-  const [buyPrice, setBuyPrice] = useState("");
-  const [isAdditional, setIsAdditional] = useState(false);
-  const [productItems, setProductItems] = useState<ProductItemDto[]>([]);
+  const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+
+  const form = useForm<DishFormValues>({
+    defaultValues: DEFAULT_VALUES,
+  });
+  const { formState, watch, setValue, getValues, reset } = form;
+  const { fields, append, remove, update } = useFieldArray({
+    control: form.control,
+    name: "items",
+  });
+  const isDirty = formState.isDirty;
 
   // Fetch data on mount
   useEffect(() => {
@@ -82,30 +107,32 @@ export default function DishesPage() {
   }, [error, clearError]);
 
   const resetForm = () => {
-    setName("");
-    setDescription("");
-    setPrice("");
-    setBuyPrice("");
-    setIsAdditional(false);
-    setProductItems([]);
+    reset(DEFAULT_VALUES);
     setEditId(null);
   };
 
   const handleSubmit = async () => {
-    if (!name.trim() || productItems.length === 0) {
+    const { name: n, description: d, price: p, buyPrice: bp, isAdditional: isAdd, items: productItems } = getValues();
+    if (!n.trim() || productItems.length === 0) {
       showErrorToast(
         "Por favor, preencha o nome e adicione pelo menos um ingrediente",
       );
       return;
     }
 
+    const parseIntegerField = (s: string): number | undefined => {
+      if (!s.trim()) return undefined;
+      const num = parseInt(s.trim(), 10);
+      return Number.isFinite(num) ? num : undefined;
+    };
+
     try {
       const data = {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        price: price ? Number(price) : undefined,
-        buyPrice: buyPrice ? Number(buyPrice) : undefined,
-        is_additional: isAdditional,
+        name: n.trim(),
+        description: d.trim() || undefined,
+        price: parseIntegerField(p),
+        buyPrice: parseIntegerField(bp),
+        is_additional: isAdd, // API field
         items: productItems,
       };
 
@@ -118,50 +145,50 @@ export default function DishesPage() {
       }
       resetForm();
       setOpen(false);
-    } catch (error: any) {
-      showErrorToast(error.message || "Falha ao salvar prato");
+    } catch (err: unknown) {
+      showErrorToast((err as Error)?.message || "Falha ao salvar prato");
     }
   };
 
   const startEdit = (product: (typeof products)[0]) => {
     setEditId(product.id);
-    setName(product.name);
-    setDescription(product.description || "");
-    setPrice(product.price ? Number(product.price).toFixed(2) : "");
-    setBuyPrice(product.buyPrice ? Number(product.buyPrice).toFixed(2) : "");
-    setIsAdditional(product.is_additional || false);
-
-    // Map product_items to ProductItemDto format
+    const priceStr = product.price ? String(Math.round(Number(product.price))) : "";
+    const buyPriceStr = product.buyPrice ? String(Math.round(Number(product.buyPrice))) : "";
     const mappedItems: ProductItemDto[] = (product.product_items || []).map(
       (pi) => ({
         itemId: pi.item_id,
         quantity: Number(pi.quantity),
       }),
     );
-    setProductItems(mappedItems);
+    reset({
+      name: product.name,
+      description: product.description || "",
+      price: priceStr,
+      buyPrice: buyPriceStr,
+      isAdditional: product.is_additional || false,
+      items: mappedItems,
+    });
     setOpen(true);
   };
 
   const addIngredient = () => {
     if (items.length === 0) return;
-    setProductItems([...productItems, { itemId: items[0].id, quantity: 1 }]);
+    append({ itemId: items[0].id, quantity: 1 });
   };
 
-  const updateIngredient = (
-    idx: number,
-    field: keyof ProductItemDto,
-    value: string | number,
-  ) => {
-    const updated = [...productItems];
-    updated[idx] = {
-      ...updated[idx],
-      [field]: field === "quantity" ? Number(value) : value,
-    };
-    setProductItems(updated);
+  /** Permite apenas dígitos (inteiros) no campo de quantidade, máx. 6 caracteres */
+  const handleQuantityInput = (idx: number, raw: string) => {
+    if (raw.length > 6) return;
+    if (/^\d*$/.test(raw)) {
+      const qty = raw === "" ? 0 : Number(raw);
+      update(idx, { ...fields[idx], quantity: qty });
+    }
   };
 
-  const removeIngredient = (idx: number) => {
-    setProductItems(productItems.filter((_, i) => i !== idx));
+  /** Permite apenas dígitos (inteiros), máx. 6 caracteres - para preço e custo */
+  const handleIntegerFieldInput = (field: "price" | "buyPrice", raw: string) => {
+    if (raw.length > 6) return;
+    if (/^\d*$/.test(raw)) setValue(field, raw, { shouldDirty: true });
   };
 
   const getItemName = (id: string) =>
@@ -181,6 +208,26 @@ export default function DishesPage() {
     return unitMap[item.unit_type] || "";
   };
 
+  const handleCloseDishDialog = (v: boolean) => {
+    if (!v) {
+      if (isDirty) {
+        setConfirmDiscardOpen(true);
+      } else {
+        setOpen(false);
+        resetForm();
+      }
+    } else {
+      setOpen(v);
+      if (!editId) reset(DEFAULT_VALUES);
+    }
+  };
+
+  const handleConfirmDiscardDish = () => {
+    setOpen(false);
+    resetForm();
+    setConfirmDiscardOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -197,13 +244,12 @@ export default function DishesPage() {
               </p>
             </div>
           </div>
-          <Dialog
-            open={open}
-            onOpenChange={(v) => {
-              setOpen(v);
-              if (!v) resetForm();
-            }}
-          >
+          <ConfirmDiscardDialog
+            open={confirmDiscardOpen}
+            onOpenChange={setConfirmDiscardOpen}
+            onConfirm={handleConfirmDiscardDish}
+          />
+          <Dialog open={open} onOpenChange={handleCloseDishDialog}>
             <DialogTrigger asChild>
               <Button
                 size="lg"
@@ -227,25 +273,22 @@ export default function DishesPage() {
                   <label className="text-sm font-medium">Nome do Prato *</label>
                   <Input
                     placeholder="Nome do prato"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    {...form.register("name")}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium">Descrição</label>
                   <Input
                     placeholder="Descrição do prato (opcional)"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
+                    {...form.register("description")}
                   />
                 </div>
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
                     id="is_additional"
-                    checked={isAdditional}
-                    onChange={(e) => setIsAdditional(e.target.checked)}
                     className="h-4 w-4 rounded border-gray-300"
+                    {...form.register("isAdditional")}
                   />
                   <label
                     htmlFor="is_additional"
@@ -260,21 +303,27 @@ export default function DishesPage() {
                       Preço unitário
                     </label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="$"
-                      step="0.01"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
+                      maxLength={6}
+                      value={watch("price")}
+                      onChange={(e) =>
+                        handleIntegerFieldInput("price", e.target.value)
+                      }
                     />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">Custo</label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       placeholder="$"
-                      step="0.01"
-                      value={buyPrice}
-                      onChange={(e) => setBuyPrice(e.target.value)}
+                      maxLength={6}
+                      value={watch("buyPrice")}
+                      onChange={(e) =>
+                        handleIntegerFieldInput("buyPrice", e.target.value)
+                      }
                     />
                   </div>
                 </div>
@@ -287,15 +336,15 @@ export default function DishesPage() {
                     </Button>
                   </div>
                   <div className="space-y-3">
-                    {productItems.map((item, idx) => (
+                    {fields.map((field, idx) => (
                       <div
-                        key={idx}
+                        key={field.id}
                         className="flex items-center gap-2 p-3 border rounded-lg bg-secondary/30"
                       >
                         <Select
-                          value={item.itemId}
+                          value={field.itemId}
                           onValueChange={(v) =>
-                            updateIngredient(idx, "itemId", v)
+                            update(idx, { ...field, itemId: v })
                           }
                         >
                           <SelectTrigger className="flex-1">
@@ -311,23 +360,28 @@ export default function DishesPage() {
                         </Select>
                         <div className="flex items-center gap-1 min-w-[120px]">
                           <Input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={6}
                             className="text-sm w-20"
-                            value={Number(item.quantity).toFixed(2)}
+                            placeholder="0"
+                            value={
+                              field.quantity === 0 ? "" : String(field.quantity)
+                            }
                             onChange={(e) =>
-                              updateIngredient(idx, "quantity", e.target.value)
+                              handleQuantityInput(idx, e.target.value)
                             }
                           />
                           <span className="text-xs text-muted-foreground min-w-[30px]">
-                            {getItemUnit(item.itemId)}
+                            {getItemUnit(field.itemId)}
                           </span>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
                           className="shrink-0"
-                          onClick={() => removeIngredient(idx)}
+                          onClick={() => remove(idx)}
                         >
                           <X className="w-4 h-4" />
                         </Button>
@@ -339,7 +393,10 @@ export default function DishesPage() {
                   className="w-full"
                   onClick={handleSubmit}
                   disabled={
-                    !name.trim() || productItems.length === 0 || isLoading
+                    !watch("name")?.trim() ||
+                    fields.length === 0 ||
+                    isLoading ||
+                    (!!editId && !isDirty)
                   }
                 >
                   {isLoading ? (
@@ -481,7 +538,7 @@ export default function DishesPage() {
                             {pi.item?.name || getItemName(pi.item_id)}
                           </div>
                           <div className="text-muted-foreground">
-                            {Number(pi.quantity).toFixed(2)}{" "}
+                            {Math.round(Number(pi.quantity))}{" "}
                             {getItemUnit(pi.item_id)}
                           </div>
                         </div>

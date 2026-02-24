@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { useForm } from "react-hook-form";
 import { useCustomers } from "@/hooks/useCustomers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,16 +11,35 @@ import { Trash2, Plus, Pencil, Users, Search, ShoppingBag, Clock, CheckCircle2, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
+import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
+
+type ClientFormValues = {
+	name: string;
+	phone: string;
+	email: string;
+	address: string;
+};
+
+const CLIENT_DEFAULT_VALUES: ClientFormValues = {
+	name: "",
+	phone: "",
+	email: "",
+	address: "",
+};
 
 export default function ClientsPage() {
 	const location = useLocation();
 	const { customers, loading, error, createCustomer, updateCustomer, deleteCustomer } = useCustomers();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
-	const [form, setForm] = useState({ name: "", phone: "", email: "", address: "" });
 	const [search, setSearch] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+
+	const form = useForm<ClientFormValues>({ defaultValues: CLIENT_DEFAULT_VALUES });
+	const { formState, getValues, reset } = form;
+	const isDirty = formState.isDirty;
 
 	// Handle opening modal from navigation
 	useEffect(() => {
@@ -44,7 +64,7 @@ export default function ClientsPage() {
 	}, [location.state, customers]);
 
 	const resetForm = () => {
-		setForm({ name: "", phone: "", email: "", address: "" });
+		reset(CLIENT_DEFAULT_VALUES);
 		setEditId(null);
 	};
 
@@ -59,33 +79,34 @@ export default function ClientsPage() {
 	};
 
 	const handleSubmit = async () => {
-		const data = {
-			name: form.name.trim(),
-			phone: form.phone.trim() || null,
-			email: form.email.trim() || null,
-			address: form.address.trim() || null,
+		const data = getValues();
+		const payload = {
+			name: data.name.trim(),
+			phone: data.phone.trim() || null,
+			email: data.email.trim() || null,
+			address: data.address.trim() || null,
 		};
-		if (!data.name) return;
+		if (!payload.name) return;
 
 		setSubmitting(true);
 		try {
 			if (editId) {
-				const success = await updateCustomer(editId, data);
+				const success = await updateCustomer(editId, payload);
 				if (success) {
 					showSuccessToast('Cliente atualizado com sucesso!');
 					resetForm();
 					setOpen(false);
 				}
 			} else {
-				const result = await createCustomer(data);
+				const result = await createCustomer(payload);
 				if (result) {
 					showSuccessToast('Cliente criado com sucesso!');
 					resetForm();
 					setOpen(false);
 				}
 			}
-		} catch (error: any) {
-			showErrorToast(error.message || 'Erro ao salvar cliente');
+		} catch (err: unknown) {
+			showErrorToast((err as Error)?.message || 'Erro ao salvar cliente');
 		} finally {
 			setSubmitting(false);
 		}
@@ -93,7 +114,12 @@ export default function ClientsPage() {
 
 	const startEdit = (c: (typeof customers)[0]) => {
 		setEditId(c.id);
-		setForm({ name: c.name, phone: c.phone || "", email: c.email || "", address: c.address || "" });
+		reset({
+			name: c.name,
+			phone: c.phone || "",
+			email: c.email || "",
+			address: c.address || "",
+		});
 		setOpen(true);
 	};
 
@@ -116,6 +142,25 @@ export default function ClientsPage() {
 		);
 	}, [customers, search]);
 
+	const handleCloseClientDialog = (v: boolean) => {
+		if (!v) {
+			if (isDirty) setConfirmDiscardOpen(true);
+			else {
+				setOpen(false);
+				resetForm();
+			}
+		} else {
+			setOpen(v);
+			if (!editId) reset(CLIENT_DEFAULT_VALUES);
+		}
+	};
+
+	const handleConfirmDiscardClient = () => {
+		setOpen(false);
+		resetForm();
+		setConfirmDiscardOpen(false);
+	};
+
 	return (
 		<div className="space-y-6">
 			{/* Header Section */}
@@ -130,12 +175,12 @@ export default function ClientsPage() {
 							<p className="text-slate-300 mt-1">Gerencie clientes e visualize seus pedidos</p>
 						</div>
 					</div>
-					<Dialog
-						open={open}
-						onOpenChange={(v) => {
-							setOpen(v);
-							if (!v) resetForm();
-						}}>
+					<ConfirmDiscardDialog
+						open={confirmDiscardOpen}
+						onOpenChange={setConfirmDiscardOpen}
+						onConfirm={handleConfirmDiscardClient}
+					/>
+					<Dialog open={open} onOpenChange={handleCloseClientDialog}>
 						<DialogTrigger asChild>
 							<Button size="lg" className="shadow-lg">
 								<Plus className="w-4 h-4 mr-2" />
@@ -149,30 +194,26 @@ export default function ClientsPage() {
 							<div className="space-y-4 mt-2">
 								<Input
 									placeholder="Nome do cliente"
-									value={form.name}
-									onChange={(e) => setForm({ ...form, name: e.target.value })}
+									{...form.register("name")}
 								/>
 								<Input
 									placeholder="Telefone"
-									value={form.phone}
-									onChange={(e) => setForm({ ...form, phone: e.target.value })}
+									{...form.register("phone")}
 								/>
 								<Input
 									placeholder="Email"
 									type="email"
-									value={form.email}
-									onChange={(e) => setForm({ ...form, email: e.target.value })}
+									{...form.register("email")}
 								/>
 								<div className="space-y-1.5">
 								<label className="text-sm font-medium">Endereço (opcional)</label>
 								<textarea
 									className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 									placeholder="Endereço de entrega ou localização..."
-									value={form.address}
-									onChange={(e) => setForm({ ...form, address: e.target.value })}
+									{...form.register("address")}
 								/>
 							</div>
-							<Button className="w-full" onClick={handleSubmit} disabled={submitting || !form.name.trim()}>
+							<Button className="w-full" onClick={handleSubmit} disabled={submitting || !form.watch("name")?.trim() || (!!editId && !isDirty)}>
 								{submitting ? (
 									<>
 										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
