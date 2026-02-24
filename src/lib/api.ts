@@ -26,18 +26,19 @@ export const apiClient: AxiosInstance = axios.create({
 // Refresh lock: only one refresh in flight; others wait on this promise
 let refreshPromise: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(tenantId?: string): Promise<string | null> {
   const state = useAuthStore.getState();
   const { refreshToken, setTokens, clearTokens } = state;
   if (!refreshToken) return null;
   try {
+    const body = tenantId ? { refreshToken, tenantId } : { refreshToken };
     const { data } = await axios.post<{
       accessToken: string;
       refreshToken?: string;
       expiresIn?: number;
     }>(
       `${API_BASE_URL}/auth/refresh`,
-      { refreshToken },
+      body,
       {
         headers: { 'Content-Type': 'application/json' },
         timeout: 10000,

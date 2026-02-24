@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/store/authStore";
 import { apiClient } from "@/lib/api";
 import { showErrorToast } from "@/lib/toastUtils";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 const ACCESS_TOKEN_EXPIRES_IN_SEC = 900; // 15 min
 
@@ -18,6 +18,7 @@ export default function LoginPage() {
 
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
+	const [showPassword, setShowPassword] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
 	// If already authenticated, redirect to app
@@ -36,12 +37,9 @@ export default function LoginPage() {
 				accessToken: string;
 				refreshToken: string;
 				expiresIn?: number;
-				user?: { id: string };
-				userId?: string;
 			}>("/auth/login", { email: email.trim(), password });
 			const expiresIn = data.expiresIn ?? ACCESS_TOKEN_EXPIRES_IN_SEC;
-			const userId = data.user?.id ?? data.userId;
-			setTokens(data.accessToken, data.refreshToken, expiresIn, userId);
+			setTokens(data.accessToken, data.refreshToken, expiresIn);
 			navigate("/", { replace: true });
 		} catch (err: unknown) {
 			const message =
@@ -88,16 +86,28 @@ export default function LoginPage() {
 						</div>
 						<div className="space-y-2">
 							<Label htmlFor="password">Senha</Label>
-							<Input
-								id="password"
-								type="password"
-								placeholder="••••••••"
-								value={password}
-								onChange={(e) => setPassword(e.target.value)}
-								autoComplete="current-password"
-								disabled={submitting}
-								required
-							/>
+							<div className="relative">
+								<Input
+									id="password"
+									type={showPassword ? "text" : "password"}
+									placeholder="••••••••"
+									value={password}
+									onChange={(e) => setPassword(e.target.value)}
+									autoComplete="current-password"
+									disabled={submitting}
+									required
+									className="pr-10"
+								/>
+								<button
+									type="button"
+									tabIndex={-1}
+									onClick={() => setShowPassword((v) => !v)}
+									className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 rounded"
+									aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+								>
+									{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+								</button>
+							</div>
 						</div>
 						<Button type="submit" className="w-full" disabled={submitting}>
 							{submitting ? (

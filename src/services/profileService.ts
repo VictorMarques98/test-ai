@@ -9,7 +9,7 @@ import { User, UpdateUserDto } from "@/types/api";
  */
 export const profileService = {
   async getProfile(): Promise<User> {
-    const userId = useAuthStore.getState().userId;
+    const userId = useAuthStore.getState().userAuth?.userId;
     if (!userId) {
       throw new Error("Usuário não identificado. Faça login novamente.");
     }
@@ -21,7 +21,7 @@ export const profileService = {
    * Update current user profile
    */
   async updateProfile(data: UpdateUserDto): Promise<User> {
-    const userId = useAuthStore.getState().userId;
+    const userId = useAuthStore.getState().userAuth?.userId;
     if (!userId) {
       throw new Error("Usuário não identificado. Faça login novamente.");
     }

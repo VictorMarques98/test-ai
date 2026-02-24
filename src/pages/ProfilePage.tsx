@@ -1,15 +1,32 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Pencil, Loader2 } from "lucide-react";
+import { User, Pencil, Loader2, ChevronsUpDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
+import { refreshAccessToken } from "@/lib/api";
 import { profileService } from "@/services/profileService";
-import type { User as UserType, UpdateUserDto } from "@/types/api";
+import { tenantsService } from "@/services/tenantsService";
+import { useAuthStore } from "@/store/authStore";
+import type { User as UserType, UpdateUserDto, Tenant as TenantType } from "@/types/api";
 
 type ProfileFormValues = {
   name: string;
@@ -30,18 +47,38 @@ function getDefaultValues(profile: UserType | null): ProfileFormValues {
 }
 
 export default function ProfilePage() {
+  const queryClient = useQueryClient();
+  const userAuth = useAuthStore((s) => s.userAuth);
+  const isAdmin = userAuth?.role === "admin";
+
   const [profile, setProfile] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [tenants, setTenants] = useState<TenantType[]>([]);
+  const [tenantsLoading, setTenantsLoading] = useState(false);
+  const [tenantPopoverOpen, setTenantPopoverOpen] = useState(false);
+  const [selectedTenantIdInModal, setSelectedTenantIdInModal] = useState<string | null>(null);
 
   const form = useForm<ProfileFormValues>({
     defaultValues: getDefaultValues(null),
   });
   const { formState, getValues, reset } = form;
   const isDirty = formState.isDirty;
+
+  const fetchProfile = () => {
+    setLoading(true);
+    setError(null);
+    profileService
+      .getProfile()
+      .then(setProfile)
+      .catch((err: unknown) => {
+        setError((err as Error)?.message ?? "Erro ao carregar perfil");
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -50,14 +87,10 @@ export default function ProfilePage() {
     profileService
       .getProfile()
       .then((data) => {
-        if (!cancelled) {
-          setProfile(data);
-        }
+        if (!cancelled) setProfile(data);
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          setError((err as Error)?.message ?? "Erro ao carregar perfil");
-        }
+        if (!cancelled) setError((err as Error)?.message ?? "Erro ao carregar perfil");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -67,6 +100,25 @@ export default function ProfilePage() {
     };
   }, []);
 
+  const fetchTenants = () => {
+    if (!isAdmin || tenants.length > 0) return;
+    setTenantsLoading(true);
+    tenantsService
+      .getTenants()
+      .then(setTenants)
+      .catch(() => setTenants([]))
+      .finally(() => setTenantsLoading(false));
+  };
+
+  const handleTenantSelect = (tenantId: string) => {
+    setSelectedTenantIdInModal(tenantId);
+    setTenantPopoverOpen(false);
+  };
+
+  const selectedTenant = selectedTenantIdInModal
+    ? tenants.find((t) => t.id === selectedTenantIdInModal)
+    : null;
+
   const resetForm = () => {
     reset(getDefaultValues(profile));
   };
@@ -74,6 +126,10 @@ export default function ProfilePage() {
   const handleOpenEdit = () => {
     reset(getDefaultValues(profile));
     setOpen(true);
+    if (isAdmin) {
+      setSelectedTenantIdInModal(useAuthStore.getState().userAuth?.tenantId ?? null);
+      fetchTenants();
+    }
   };
 
   const handleCloseEditDialog = (v: boolean) => {
@@ -105,9 +161,18 @@ export default function ProfilePage() {
     if (data.password?.trim()) {
       payload.password = data.password.trim();
     }
+    if (isAdmin && selectedTenantIdInModal) {
+      payload.tenantId = selectedTenantIdInModal;
+    }
 
     setSubmitting(true);
     try {
+      if (isAdmin && selectedTenantIdInModal && selectedTenantIdInModal !== userAuth?.tenantId) {
+        const token = await refreshAccessToken(selectedTenantIdInModal);
+        if (!token) throw new Error("Sessão inválida. Faça login novamente.");
+        queryClient.invalidateQueries();
+        fetchProfile();
+      }
       const updated = await profileService.updateProfile(payload);
       setProfile(updated);
       showSuccessToast("Perfil atualizado com sucesso!");
@@ -181,6 +246,52 @@ export default function ProfilePage() {
                 {...form.register("password")}
               />
             </div>
+            {isAdmin && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <p className="text-sm font-semibold text-muted-foreground">Ação administrativa</p>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Empresa selecionada</label>
+                <Popover open={tenantPopoverOpen} onOpenChange={(open) => {
+                  setTenantPopoverOpen(open);
+                  if (open) fetchTenants();
+                }}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={tenantPopoverOpen}
+                      className="w-full justify-between font-normal"
+                      disabled={tenantsLoading}
+                    >
+                      {tenantsLoading
+                        ? "Carregando..."
+                        : selectedTenant?.name ?? "Selecione a empresa"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar empresa..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhuma empresa encontrada.</CommandEmpty>
+                        <CommandGroup>
+                          {tenants.map((t) => (
+                            <CommandItem
+                              key={t.id}
+                              value={t.name}
+                              onSelect={() => handleTenantSelect(t.id)}
+                            >
+                              {t.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2 pt-2">
               <Button
                 variant="outline"
@@ -197,7 +308,7 @@ export default function ProfilePage() {
                   submitting ||
                   !form.watch("name")?.trim() ||
                   !form.watch("email")?.trim() ||
-                  !isDirty
+                  (!isDirty && !(isAdmin && selectedTenantIdInModal && selectedTenantIdInModal !== userAuth?.tenantId))
                 }
               >
                 {submitting ? (

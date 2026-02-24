@@ -165,6 +165,21 @@ export interface UpdateUserDto {
   phone: string;
   address: string;
   password?: string;
+  tenantId?: string; // admin: persiste no usuário para o próximo login
+}
+
+// === Auth (from JWT payload) ===
+export interface UserAuth {
+  userId: string;
+  role?: string;
+  tenantId?: string;
+  [key: string]: unknown;
+}
+
+// === Tenants ===
+export interface Tenant {
+  id: string;
+  name: string;
 }
 
 // === API Response Types ===
