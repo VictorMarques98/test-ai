@@ -27,6 +27,7 @@ import {
 import type { UnitType } from "@/types/api";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 // Helper function to get unit display information
 const getUnitDisplay = (unitType: UnitType) => {
@@ -76,6 +77,7 @@ export default function ItemsPage() {
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
 	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+	const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
 
 	const form = useForm<ItemFormValues>({ defaultValues: ITEM_DEFAULT_VALUES });
 	const { formState, getValues, reset } = form;
@@ -181,16 +183,14 @@ export default function ItemsPage() {
 		setOpen(true);
 	};
 
-	const handleDelete = async (id: string) => {
-		if (!confirm('Tem certeza que deseja excluir este ingrediente? Esta ação não pode ser desfeita.')) return;
-
+	const handleConfirmDeleteItem = async (id: string) => {
 		try {
 			await deleteItem(id);
 			showSuccessToast('Ingrediente excluído com sucesso!');
 			await fetchItems();
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error('Failed to delete item:', err);
-			showErrorToast(err.message || 'Erro ao excluir item');
+			showErrorToast((err as Error)?.message || 'Erro ao excluir item');
 		}
 	};
 
@@ -258,6 +258,18 @@ export default function ItemsPage() {
 						open={confirmDiscardOpen}
 						onOpenChange={setConfirmDiscardOpen}
 						onConfirm={handleConfirmDiscardItem}
+					/>
+					<ConfirmActionDialog
+						open={deleteItemId !== null}
+						onOpenChange={(open) => !open && setDeleteItemId(null)}
+						onConfirm={() => {
+							if (deleteItemId) handleConfirmDeleteItem(deleteItemId);
+							setDeleteItemId(null);
+						}}
+						title="Excluir ingrediente?"
+						description="Tem certeza que deseja excluir este ingrediente? Esta ação não pode ser desfeita."
+						confirmLabel="Excluir"
+						variant="destructive"
 					/>
 					<Dialog open={open} onOpenChange={handleCloseItemDialog}>
 						<DialogTrigger asChild>
@@ -558,7 +570,7 @@ export default function ItemsPage() {
 														variant="ghost"
 														size="icon"
 													className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-														onClick={() => handleDelete(item.id)}
+														onClick={() => setDeleteItemId(item.id)}
 														disabled={isLoading}
 													>
 														<Trash2 className="w-4 h-4" />

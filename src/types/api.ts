@@ -157,6 +157,9 @@ export interface User {
   email: string;
   phone?: string | null;
   address?: string | null;
+  role?: string;
+  tenantId?: string;
+  status?: string; // 'active' | 'inactive'
 }
 
 export interface UpdateUserDto {
@@ -166,6 +169,19 @@ export interface UpdateUserDto {
   address: string;
   password?: string;
   tenantId?: string; // admin: persiste no usuário para o próximo login
+  role?: string;
+  status?: string; // 'active' | 'inactive'
+}
+
+/** Create user (admin): POST /auth/register */
+export interface RegisterDto {
+  tenantId: string;
+  role: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  address?: string | null;
+  password: string;
 }
 
 // === Auth (from JWT payload) ===
@@ -180,6 +196,17 @@ export interface UserAuth {
 export interface Tenant {
   id: string;
   name: string;
+  type?: 'kds' | string;
+  created_at?: string;
+  updated_at?: string;
+  /** Included when GET /tenants returns embedded users */
+  users?: User[];
+}
+
+/** Create tenant: POST /tenants */
+export interface CreateTenantDto {
+  name: string;
+  type?: 'kds';
 }
 
 // === API Response Types ===

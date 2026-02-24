@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 type ClientFormValues = {
 	name: string;
@@ -36,6 +37,7 @@ export default function ClientsPage() {
 	const [submitting, setSubmitting] = useState(false);
 	const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 	const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+	const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
 
 	const form = useForm<ClientFormValues>({ defaultValues: CLIENT_DEFAULT_VALUES });
 	const { formState, getValues, reset } = form;
@@ -123,14 +125,12 @@ export default function ClientsPage() {
 		setOpen(true);
 	};
 
-	const handleDelete = async (id: string) => {
-		if (window.confirm("Tem certeza que deseja remover este cliente?")) {
-			const success = await deleteCustomer(id);
-			if (success) {
-				showSuccessToast('Cliente removido com sucesso!');
-			} else {
-				showErrorToast('Erro ao remover cliente');
-			}
+	const handleConfirmDeleteClient = async (id: string) => {
+		const success = await deleteCustomer(id);
+		if (success) {
+			showSuccessToast('Cliente removido com sucesso!');
+		} else {
+			showErrorToast('Erro ao remover cliente');
 		}
 	};
 
@@ -179,6 +179,18 @@ export default function ClientsPage() {
 						open={confirmDiscardOpen}
 						onOpenChange={setConfirmDiscardOpen}
 						onConfirm={handleConfirmDiscardClient}
+					/>
+					<ConfirmActionDialog
+						open={deleteClientId !== null}
+						onOpenChange={(open) => !open && setDeleteClientId(null)}
+						onConfirm={() => {
+							if (deleteClientId) handleConfirmDeleteClient(deleteClientId);
+							setDeleteClientId(null);
+						}}
+						title="Remover cliente?"
+						description="Tem certeza que deseja remover este cliente? Esta ação não pode ser desfeita."
+						confirmLabel="Remover"
+						variant="destructive"
 					/>
 					<Dialog open={open} onOpenChange={handleCloseClientDialog}>
 						<DialogTrigger asChild>
@@ -301,7 +313,7 @@ export default function ClientsPage() {
 
 									return (
 										<>
-											<TableRow key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+											<TableRow key={c.id} className="hover:bg-background">
 												<TableCell>
 													<Button
 														variant="ghost"
@@ -356,7 +368,7 @@ export default function ClientsPage() {
 														<Button
 															variant="ghost"
 															size="icon"
-															onClick={() => handleDelete(c.id)}
+															onClick={() => setDeleteClientId(c.id)}
 															className="h-8 w-8 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-600">
 															<Trash2 className="w-4 h-4" />
 														</Button>
@@ -364,7 +376,7 @@ export default function ClientsPage() {
 												</TableCell>
 											</TableRow>
 											{isExpanded && (
-												<TableRow key={`${c.id}-details`} className="bg-slate-50 dark:bg-slate-900/50">
+												<TableRow key={`${c.id}-details`} className="bg-card hover:bg-card">
 													<TableCell colSpan={8} className="p-6">
 														<div className="space-y-4">
 															{/* Address Section */}
@@ -379,8 +391,8 @@ export default function ClientsPage() {
 															
 															{/* Dates Section */}
 															<div className="grid grid-cols-2 gap-4">
-																<div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
-																	<p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+																<div className="p-3 bg-muted/50 rounded-lg">
+																	<p className="text-xs font-medium text-muted-foreground mb-1">
 																		Cliente desde
 																	</p>
 																	<p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -391,8 +403,8 @@ export default function ClientsPage() {
 																		})}
 																	</p>
 																</div>
-																<div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
-																	<p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+																<div className="p-3 bg-muted/50 rounded-lg">
+																	<p className="text-xs font-medium text-muted-foreground mb-1">
 																		Última atualização
 																	</p>
 																	<p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -411,7 +423,7 @@ export default function ClientsPage() {
 																	<h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-3">
 																		Histórico de Pedidos ({customerOrders.length})
 																	</h4>
-																	<div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+																	<div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-card">
 																		<Table>
 																			<TableHeader>
 																				<TableRow className="bg-slate-100 dark:bg-slate-800">
@@ -426,7 +438,7 @@ export default function ClientsPage() {
 																				{customerOrders.map((order: any) => (
 																					<TableRow
 																						key={order.id}
-																						className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+																						className="hover:bg-background">
 																						<TableCell className="font-mono text-xs font-semibold">
 																							#{order.id.slice(0, 8)}
 																						</TableCell>
@@ -491,7 +503,7 @@ export default function ClientsPage() {
 																	</div>
 																</div>
 															) : (
-																<div className="text-center py-8 bg-slate-100 dark:bg-slate-900/50 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700">
+																<div className="text-center py-8 bg-muted/50 rounded-lg border-2 border-dashed border-border">
 																	<ShoppingBag className="w-10 h-10 text-slate-400 mx-auto mb-2" />
 																	<p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
 																		Nenhum pedido ainda

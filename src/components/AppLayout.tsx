@@ -10,6 +10,7 @@ import {
   PackageOpen,
   LogOut,
   User,
+  Settings,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const links = [
 export default function AppLayout() {
   const navigate = useNavigate();
   const clearTokens = useAuthStore((s) => s.clearTokens);
+  const isAdmin = useAuthStore((s) => s.userAuth?.role) === "admin";
 
   const handleLogout = () => {
     clearTokens();
@@ -59,6 +61,21 @@ export default function AppLayout() {
               {l.label}
             </NavLink>
           ))}
+          {isAdmin && (
+            <NavLink
+              to="/management"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-2 border-dashed ${
+                  isActive
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-primary/50 text-muted-foreground hover:bg-secondary hover:text-foreground hover:border-primary"
+                }`
+              }
+            >
+              <Settings className="w-4 h-4" />
+              Gerenciamento
+            </NavLink>
+          )}
         </nav>
         <Button
           variant="ghost"
@@ -87,6 +104,19 @@ export default function AppLayout() {
             {l.label}
           </NavLink>
         ))}
+        {isAdmin && (
+          <NavLink
+            to="/management"
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center py-3 text-xs transition-colors border-t-2 border-dashed border-primary/50 ${
+                isActive ? "text-primary" : "text-muted-foreground"
+              }`
+            }
+          >
+            <Settings className="w-5 h-5 mb-1" />
+            Gerenciamento
+          </NavLink>
+        )}
         <button
           type="button"
           className="flex-1 flex flex-col items-center py-3 text-xs text-muted-foreground"

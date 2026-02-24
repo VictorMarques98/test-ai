@@ -33,6 +33,7 @@ import {
 import { ProductItemDto } from "@/types/api";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 type DishFormValues = {
   name: string;
@@ -69,6 +70,7 @@ export default function DishesPage() {
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
 
   const form = useForm<DishFormValues>({
     defaultValues: DEFAULT_VALUES,
@@ -133,7 +135,7 @@ export default function DishesPage() {
         price: parseIntegerField(p),
         buyPrice: parseIntegerField(bp),
         is_additional: isAdd, // API field
-        items: productItems,
+        items: productItems.map(({ itemId, quantity }) => ({ itemId, quantity })),
       };
 
       if (editId) {
@@ -147,6 +149,15 @@ export default function DishesPage() {
       setOpen(false);
     } catch (err: unknown) {
       showErrorToast((err as Error)?.message || "Falha ao salvar prato");
+    }
+  };
+
+  const handleConfirmDeleteProduct = async (id: string) => {
+    try {
+      await deleteProduct(id);
+      showSuccessToast("Prato excluído com sucesso!");
+    } catch (err: unknown) {
+      showErrorToast((err as Error)?.message || "Falha ao excluir prato");
     }
   };
 
@@ -248,6 +259,18 @@ export default function DishesPage() {
             open={confirmDiscardOpen}
             onOpenChange={setConfirmDiscardOpen}
             onConfirm={handleConfirmDiscardDish}
+          />
+          <ConfirmActionDialog
+            open={deleteProductId !== null}
+            onOpenChange={(open) => !open && setDeleteProductId(null)}
+            onConfirm={() => {
+              if (deleteProductId) handleConfirmDeleteProduct(deleteProductId);
+              setDeleteProductId(null);
+            }}
+            title="Excluir prato?"
+            description="Tem certeza que deseja excluir este prato? Esta ação não pode ser desfeita."
+            confirmLabel="Excluir"
+            variant="destructive"
           />
           <Dialog open={open} onOpenChange={handleCloseDishDialog}>
             <DialogTrigger asChild>
@@ -495,22 +518,7 @@ export default function DishesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={async () => {
-                            if (
-                              confirm(
-                                "Tem certeza que deseja excluir este prato?",
-                              )
-                            ) {
-                              try {
-                                await deleteProduct(product.id);
-                                showSuccessToast("Prato excluído com sucesso!");
-                              } catch (error: any) {
-                                showErrorToast(
-                                  error.message || "Falha ao excluir prato",
-                                );
-                              }
-                            }
-                          }}
+                          onClick={() => setDeleteProductId(product.id)}
                           className="hover:bg-destructive/10 hover:text-destructive"
                         >
                           <Trash2 className="w-4 h-4" />

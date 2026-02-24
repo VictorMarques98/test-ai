@@ -12,6 +12,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import type { UnitType } from "@/types/api";
+import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
 
 // Helper function to get unit display information
 const getUnitDisplay = (unitType: UnitType) => {
@@ -42,6 +43,7 @@ export default function InventoryPage() {
 	} = useRestaurantStore();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
+	const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
 	const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 	const [form, setForm] = useState({ 
 		name: "", 
@@ -155,15 +157,13 @@ export default function InventoryPage() {
 		setOpen(true);
 	};
 
-	const handleDelete = async (id: string) => {
-		if (!confirm('Tem certeza que deseja excluir este item?')) return;
-
+	const handleConfirmDeleteItem = async (id: string) => {
 		try {
 			await deleteItem(id);
 			toast.success('Item excluído com sucesso!');
-		} catch (err: any) {
+		} catch (err: unknown) {
 			console.error('Failed to delete item:', err);
-			toast.error(err.message || 'Erro ao excluir item');
+			toast.error((err as Error)?.message || 'Erro ao excluir item');
 		}
 	};
 
@@ -282,6 +282,18 @@ export default function InventoryPage() {
 							<p className="text-slate-300 mt-1">Gerencie seus ingredientes</p>
 						</div>
 					</div>
+					<ConfirmActionDialog
+						open={deleteItemId !== null}
+						onOpenChange={(open) => !open && setDeleteItemId(null)}
+						onConfirm={() => {
+							if (deleteItemId) handleConfirmDeleteItem(deleteItemId);
+							setDeleteItemId(null);
+						}}
+						title="Excluir item?"
+						description="Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita."
+						confirmLabel="Excluir"
+						variant="destructive"
+					/>
 					<Dialog
 						open={open}
 						onOpenChange={(v) => {
@@ -601,7 +613,7 @@ export default function InventoryPage() {
 															variant="ghost"
 															size="icon"
 															className="hover:bg-destructive/10 hover:text-destructive"
-															onClick={() => handleDelete(item.id)}
+															onClick={() => setDeleteItemId(item.id)}
 															disabled={isLoading}>
 															<Trash2 className="w-4 h-4" />
 														</Button>
