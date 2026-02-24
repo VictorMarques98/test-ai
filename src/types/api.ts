@@ -150,6 +150,23 @@ export interface Order {
   order_items?: OrderItem[];
 }
 
+// === User / Profile ===
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  address?: string | null;
+}
+
+export interface UpdateUserDto {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  password?: string;
+}
+
 // === API Response Types ===
 export interface ApiError {
   statusCode: number;

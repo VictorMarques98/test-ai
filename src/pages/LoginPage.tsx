@@ -36,9 +36,12 @@ export default function LoginPage() {
 				accessToken: string;
 				refreshToken: string;
 				expiresIn?: number;
+				user?: { id: string };
+				userId?: string;
 			}>("/auth/login", { email: email.trim(), password });
 			const expiresIn = data.expiresIn ?? ACCESS_TOKEN_EXPIRES_IN_SEC;
-			setTokens(data.accessToken, data.refreshToken, expiresIn);
+			const userId = data.user?.id ?? data.userId;
+			setTokens(data.accessToken, data.refreshToken, expiresIn, userId);
 			navigate("/", { replace: true });
 		} catch (err: unknown) {
 			const message =

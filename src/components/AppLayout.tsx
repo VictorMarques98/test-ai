@@ -9,6 +9,7 @@ import {
   Box,
   PackageOpen,
   LogOut,
+  User,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ const links = [
   { to: "/stock", label: "Estoque", icon: PackageOpen },
   { to: "/clients", label: "Clientes", icon: Users },
   { to: "/reports", label: "Relatórios", icon: BarChart3, disabled: true },
+  { to: "/profile", label: "Meu Perfil", icon: User },
 ];
 
 export default function AppLayout() {
