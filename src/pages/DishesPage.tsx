@@ -81,6 +81,7 @@ export default function DishesPage() {
     name: "items",
   });
   const isDirty = formState.isDirty;
+  const watchedItems = watch("items");
 
   // Fetch data on mount
   useEffect(() => {
@@ -114,7 +115,15 @@ export default function DishesPage() {
   };
 
   const handleSubmit = async () => {
-    const { name: n, description: d, price: p, buyPrice: bp, isAdditional: isAdd, items: productItems } = getValues();
+    const {
+      name: n,
+      description: d,
+      price: p,
+      buyPrice: bp,
+      isAdditional: isAdd,
+      items: productItems,
+    } = getValues();
+
     if (!n.trim() || productItems.length === 0) {
       showErrorToast(
         "Por favor, preencha o nome e adicione pelo menos um ingrediente",
@@ -122,9 +131,10 @@ export default function DishesPage() {
       return;
     }
 
-    const parseIntegerField = (s: string): number | undefined => {
+    const parseDecimalField = (s: string): number | undefined => {
       if (!s.trim()) return undefined;
-      const num = parseInt(s.trim(), 10);
+      const normalized = s.trim().replace(",", ".");
+      const num = parseFloat(normalized);
       return Number.isFinite(num) ? num : undefined;
     };
 
@@ -132,10 +142,13 @@ export default function DishesPage() {
       const data = {
         name: n.trim(),
         description: d.trim() || undefined,
-        price: parseIntegerField(p),
-        buyPrice: parseIntegerField(bp),
+        price: parseDecimalField(p),
+        buyPrice: parseDecimalField(bp),
         is_additional: isAdd, // API field
-        items: productItems.map(({ itemId, quantity }) => ({ itemId, quantity })),
+        items: productItems.map(({ itemId, quantity }) => ({
+          itemId,
+          quantity: toApiQuantity(itemId, quantity),
+        })),
       };
 
       if (editId) {
@@ -163,12 +176,18 @@ export default function DishesPage() {
 
   const startEdit = (product: (typeof products)[0]) => {
     setEditId(product.id);
-    const priceStr = product.price ? String(Math.round(Number(product.price))) : "";
-    const buyPriceStr = product.buyPrice ? String(Math.round(Number(product.buyPrice))) : "";
+    const priceStr =
+      product.price !== undefined && product.price !== null
+        ? Number(product.price).toFixed(2)
+        : "";
+    const buyPriceStr =
+      product.buyPrice !== undefined && product.buyPrice !== null
+        ? Number(product.buyPrice).toFixed(2)
+        : "";
     const mappedItems: ProductItemDto[] = (product.product_items || []).map(
       (pi) => ({
         itemId: pi.item_id,
-        quantity: Number(pi.quantity),
+        quantity: toDisplayQuantity(pi.item_id, Number(pi.quantity)),
       }),
     );
     reset({
@@ -192,32 +211,55 @@ export default function DishesPage() {
     if (raw.length > 6) return;
     if (/^\d*$/.test(raw)) {
       const qty = raw === "" ? 0 : Number(raw);
-      update(idx, { ...fields[idx], quantity: qty });
+      setValue(`items.${idx}.quantity`, qty, { shouldDirty: true });
     }
   };
 
-  /** Permite apenas dígitos (inteiros), máx. 6 caracteres - para preço e custo */
-  const handleIntegerFieldInput = (field: "price" | "buyPrice", raw: string) => {
+  /** Permite números decimais, máx. 6 caracteres - para preço e custo */
+  const handleDecimalFieldInput = (
+    field: "price" | "buyPrice",
+    raw: string,
+  ) => {
     if (raw.length > 6) return;
-    if (/^\d*$/.test(raw)) setValue(field, raw, { shouldDirty: true });
+    const normalized = raw.replace(",", ".");
+    if (/^\d*(\.\d{0,2})?$/.test(normalized)) {
+      setValue(field, normalized, { shouldDirty: true });
+    }
   };
 
   const getItemName = (id: string) =>
     items.find((i) => i.id === id)?.name || "Desconhecido";
-  const getItemUnit = (id: string) => {
-    const item = items.find((i) => i.id === id);
-    if (!item) return "";
+
+  function getItemUnitType(id: string) {
+    return items.find((i) => i.id === id)?.unit_type;
+  }
+
+  function getItemUnit(id: string) {
+    const unitType = getItemUnitType(id);
+    if (!unitType) return "";
 
     const unitMap = {
       grams: "g",
-      kg: "kg",
+      kg: "g",
       ml: "ml",
       liters: "L",
       unit: "un",
     };
 
-    return unitMap[item.unit_type] || "";
-  };
+    return unitMap[unitType] || "";
+  }
+
+  function toDisplayQuantity(itemId: string, quantity: number) {
+    const unitType = getItemUnitType(itemId);
+    if (unitType === "kg") return Math.round(quantity * 1000);
+    return quantity;
+  }
+
+  function toApiQuantity(itemId: string, quantity: number) {
+    const unitType = getItemUnitType(itemId);
+    if (unitType === "kg") return quantity / 1000;
+    return quantity;
+  }
 
   const handleCloseDishDialog = (v: boolean) => {
     if (!v) {
@@ -323,29 +365,31 @@ export default function DishesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium">
-                      Preço unitário
+                      Preço de venda (unidade)
                     </label>
                     <Input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="decimal"
                       placeholder="$"
                       maxLength={6}
                       value={watch("price")}
                       onChange={(e) =>
-                        handleIntegerFieldInput("price", e.target.value)
+                        handleDecimalFieldInput("price", e.target.value)
                       }
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-sm font-medium">Custo</label>
+                    <label className="text-sm font-medium">
+                      Custo (unidade)
+                    </label>
                     <Input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="decimal"
                       placeholder="$"
                       maxLength={6}
                       value={watch("buyPrice")}
                       onChange={(e) =>
-                        handleIntegerFieldInput("buyPrice", e.target.value)
+                        handleDecimalFieldInput("buyPrice", e.target.value)
                       }
                     />
                   </div>
@@ -390,7 +434,9 @@ export default function DishesPage() {
                             className="text-sm w-20"
                             placeholder="0"
                             value={
-                              field.quantity === 0 ? "" : String(field.quantity)
+                              watchedItems?.[idx]?.quantity === 0
+                                ? ""
+                                : String(watchedItems?.[idx]?.quantity ?? "")
                             }
                             onChange={(e) =>
                               handleQuantityInput(idx, e.target.value)
@@ -471,43 +517,19 @@ export default function DishesPage() {
                 <div className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-b flex-shrink-0">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-lg truncate">
+                      <div className="flex items-center gap-2 mb-1">
+                      <p className="font-bold text-lg truncate w-full">
                         {product.name}
                       </p>
-                      {product.description && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                          {product.description}
-                        </p>
-                      )}
-                      <div className="flex gap-3 mt-2 text-sm">
-                        {product.price && (
-                          <span className="text-muted-foreground">
-                            Preço Venda:{" "}
-                            <span className="font-bold text-primary">
-                              ${Number(product.price).toFixed(2)}
-                            </span>
-                          </span>
+                      <div className="flex gap-1 items-center">
+                        {product.is_additional && (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                          >
+                            Complemento
+                          </Badge>
                         )}
-                        {product.buyPrice && (
-                          <span className="text-muted-foreground">
-                            Preço Custo:{" "}
-                            <span className="font-semibold text-foreground">
-                              ${Number(product.buyPrice).toFixed(2)}
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 ml-2">
-                      {product.is_additional && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30"
-                        >
-                          Complemento
-                        </Badge>
-                      )}
-                      <div className="flex gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -523,7 +545,31 @@ export default function DishesPage() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>{" "}
-                      </div>{" "}
+                      </div>
+                      </div>
+                      {product.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                          {product.description}
+                        </p>
+                      )}
+                      <div className="flex gap-3 mt-3 text-sm">
+                        {product.price && (
+                          <span className="text-muted-foreground">
+                            Preço de venda (unidade):{" "}
+                            <span className="font-bold text-primary">
+                              ${Number(product.price).toFixed(2)}
+                            </span>
+                          </span>
+                        )}
+                        {product.buyPrice && (
+                          <span className="text-muted-foreground">
+                            Preço Custo:{" "}
+                            <span className="font-semibold text-foreground">
+                              ${Number(product.buyPrice).toFixed(2)}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -546,7 +592,12 @@ export default function DishesPage() {
                             {pi.item?.name || getItemName(pi.item_id)}
                           </div>
                           <div className="text-muted-foreground">
-                            {Math.round(Number(pi.quantity))}{" "}
+                            {Math.round(
+                              toDisplayQuantity(
+                                pi.item_id,
+                                Number(pi.quantity),
+                              ),
+                            )}{" "}
                             {getItemUnit(pi.item_id)}
                           </div>
                         </div>
