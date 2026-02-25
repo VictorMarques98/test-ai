@@ -421,7 +421,14 @@ export default function OrdersPage() {
     });
   }, [orders, filterStatus, filterOrderNumber, filterDateFrom, filterDateTo]);
 
-  const sortedOrders = [...filteredOrders].reverse();
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    // Prioritize "in_progress" orders first
+    if (a.status === "in_progress" && b.status !== "in_progress") return -1;
+    if (a.status !== "in_progress" && b.status === "in_progress") return 1;
+    
+    // Then sort by creation date (newest first)
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   const hasActiveFilters =
     filterStatus !== "all" ||
@@ -975,7 +982,7 @@ export default function OrdersPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-300">
-                        {new Date(o.created_at).toLocaleDateString("pt-BR", {
+                        {new Date(o.created_at).toLocaleDateString("EN-us", {
                           day: "2-digit",
                           month: "short",
                           year: "numeric",

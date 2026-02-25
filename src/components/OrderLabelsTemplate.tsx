@@ -218,7 +218,7 @@ export const OrderLabelsTemplate = forwardRef<HTMLDivElement, OrderLabelsTemplat
 							
 							<div className="order-info">
 								<div>
-									{new Date(order.created_at).toLocaleDateString("pt-BR", {
+									{new Date(order.created_at).toLocaleDateString("EN-us", {
 										day: "2-digit",
 										month: "short",
 										year: "numeric",

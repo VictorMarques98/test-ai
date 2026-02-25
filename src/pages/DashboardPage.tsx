@@ -100,7 +100,7 @@ export default function DashboardPage() {
 											</span>
 										</TableCell>
 										<TableCell className="text-muted-foreground">
-											{new Date(o.created_at).toLocaleDateString("pt-BR", {
+											{new Date(o.created_at).toLocaleDateString("EN-us", {
 												day: "2-digit",
 												month: "short",
 												year: "numeric"

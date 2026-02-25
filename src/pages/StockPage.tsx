@@ -730,7 +730,7 @@ export default function StockPage() {
 														</TableCell>
 														<TableCell className="text-right">
 															<span className="font-semibold text-green-600 dark:text-green-500">
-																{Number(s.quantity).toLocaleString('pt-BR', { 
+																{Number(s.quantity).toLocaleString('EN-us', { 
 																	minimumFractionDigits: unitDisplay.decimals,
 																	maximumFractionDigits: unitDisplay.decimals
 																})} {unitDisplay.abbr}
@@ -739,7 +739,7 @@ export default function StockPage() {
 														<TableCell className="text-right">
 															{s.reserved_quantity > 0 ? (
 																<span className="font-semibold text-amber-600 dark:text-amber-500">
-																	{Number(s.reserved_quantity).toLocaleString('pt-BR', { 
+																	{Number(s.reserved_quantity).toLocaleString('EN-us', { 
 																		minimumFractionDigits: unitDisplay.decimals,
 																		maximumFractionDigits: unitDisplay.decimals
 																	})} {unitDisplay.abbr}
@@ -751,7 +751,7 @@ export default function StockPage() {
 														<TableCell className="text-right">
 															{s.alert_quantity !== null ? (
 																<span className="font-semibold">
-																	{Number(s.alert_quantity).toLocaleString('pt-BR', { 
+																	{Number(s.alert_quantity).toLocaleString('EN-us', { 
 																		minimumFractionDigits: unitDisplay.decimals,
 																		maximumFractionDigits: unitDisplay.decimals
 																	})} {unitDisplay.abbr}
@@ -842,7 +842,7 @@ export default function StockPage() {
 												return (
 												<TableRow key={entry.id} className="hover:bg-muted/30">
 													<TableCell className="font-medium">
-														{new Date(entry.created_at).toLocaleString('pt-BR', {
+														{new Date(entry.created_at).toLocaleString('EN-us', {
 															day: '2-digit',
 															month: 'short',
 															year: 'numeric',
@@ -867,7 +867,7 @@ export default function StockPage() {
 														)}
 													</TableCell>
 													<TableCell className="font-mono">
-														{Number(entry.quantity).toLocaleString('pt-BR', {
+														{Number(entry.quantity).toLocaleString('en-US', {
 															minimumFractionDigits: unitDisplay.decimals,
 															maximumFractionDigits: unitDisplay.decimals
 														})} {unitDisplay.abbr}
@@ -875,7 +875,7 @@ export default function StockPage() {
 													<TableCell className="text-right">
 														{entry.operation === 'add' && entry.purchase_price !== null && entry.purchase_price !== undefined ? (
 															<span className="font-semibold text-green-600 dark:text-green-500">
-																R$ {Number(entry.purchase_price).toLocaleString('pt-BR', {
+																$ {Number(entry.purchase_price).toLocaleString('en-US', {
 																	minimumFractionDigits: 2,
 																	maximumFractionDigits: 2
 																})}
