@@ -13,7 +13,7 @@ import InventoryPage from "@/pages/InventoryPage";
 import DishesPage from "@/pages/DishesPage";
 import OrdersPage from "@/pages/OrdersPage";
 import ClientsPage from "@/pages/ClientsPage";
-import ReportsPage from "@/pages/ReportsPage";
+// import ReportsPage from "@/pages/ReportsPage"; // Commented out - uses old data structure
 import ProfilePage from "@/pages/ProfilePage";
 import ManagementPage from "@/pages/ManagementPage";
 import NotFound from "./pages/NotFound";
@@ -38,7 +38,7 @@ const App = () => (
 							<Route path="/orders" element={<OrdersPage />} />
 							<Route path="/clients" element={<ClientsPage />} />
 							<Route path="/management" element={<ManagementPage />} />
-							<Route path="/reports" element={<ReportsPage />} />
+							{/* <Route path="/reports" element={<ReportsPage />} /> */} {/* Commented out - needs refactoring for new API */}
 							<Route path="/profile" element={<ProfilePage />} />
 						</Route>
 					</Route>
