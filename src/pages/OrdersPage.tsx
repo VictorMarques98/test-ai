@@ -37,14 +37,28 @@ import {
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import { OrderLabelsTemplate } from "@/components/OrderLabelsTemplate";
+import { useForm } from "react-hook-form";
+
+type CreateClientFormValues = {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+};
+
+const CREATE_CLIENT_DEFAULT_VALUES: CreateClientFormValues = {
+  name: "",
+  phone: "",
+  email: "",
+  address: "",
+};
 
 export default function OrdersPage() {
   const location = useLocation();
-  const navigate = useNavigate();
   const {
     orders,
     products,
@@ -56,7 +70,7 @@ export default function OrdersPage() {
     updateOrderStatus,
     clearError,
   } = useRestaurantStore();
-  const { customers } = useCustomers();
+  const { customers, createCustomer: hookCreateCustomer, fetchCustomers } = useCustomers();
   const [open, setOpen] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<
     { productId: string; quantity: number }[]
@@ -69,6 +83,13 @@ export default function OrdersPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [newClientOpen, setNewClientOpen] = useState(false);
+  const [submittingClient, setSubmittingClient] = useState(false);
+
+  const clientForm = useForm<CreateClientFormValues>({
+    defaultValues: CREATE_CLIENT_DEFAULT_VALUES,
+  });
+  const { getValues: getClientValues, reset: resetClientForm } = clientForm;
 
   // Filter states
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -80,6 +101,40 @@ export default function OrdersPage() {
   // Print states
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Create new customer function
+  const handleCreateCustomer = async () => {
+    const data = getClientValues();
+    const payload = {
+      name: data.name.trim(),
+      phone: data.phone.trim() || null,
+      email: data.email.trim() || null,
+      address: data.address.trim() || null,
+    };
+
+    if (!payload.name) {
+      showErrorToast("Nome do cliente é obrigatório");
+      return;
+    }
+
+    setSubmittingClient(true);
+    try {
+      const result = await hookCreateCustomer(payload);
+      if (result) {
+        showSuccessToast("Cliente criado com sucesso!");
+        resetClientForm(CREATE_CLIENT_DEFAULT_VALUES);
+        setNewClientOpen(false);
+        // Refresh customers
+        if (fetchCustomers) {
+          await fetchCustomers();
+        }
+      }
+    } catch (err: unknown) {
+      showErrorToast((err as Error)?.message || "Erro ao criar cliente");
+    } finally {
+      setSubmittingClient(false);
+    }
+  };
 
   // Print handler
   const handlePrint = useReactToPrint({
@@ -488,10 +543,7 @@ export default function OrdersPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        setOpen(false);
-                        navigate("/clients", { state: { openModal: true } });
-                      }}
+                      onClick={() => setNewClientOpen(true)}
                       className="h-7 text-xs"
                     >
                       <UserPlus className="w-3 h-3 mr-1" />
@@ -1104,7 +1156,85 @@ export default function OrdersPage() {
             customerName={getCustomerName(orderToPrint)}
           />
         </div>
-      )}{" "}
+      )}
+      {/* New Customer Modal */}
+      <NewCustomerModal
+        open={newClientOpen}
+        onOpenChange={setNewClientOpen}
+        onSubmit={handleCreateCustomer}
+        isSubmitting={submittingClient}
+        form={clientForm}
+      />
     </div>
+  );
+}
+
+/** New Customer Modal Dialog */
+function NewCustomerModal({
+  open,
+  onOpenChange,
+  onSubmit,
+  isSubmitting,
+  form,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSubmit: () => Promise<void>;
+  isSubmitting: boolean;
+  form: any;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Criar novo cliente</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Nome *</label>
+            <Input
+              placeholder="Nome do cliente"
+              {...form.register("name")}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Telefone</label>
+            <Input
+              placeholder="(11) 99999-9999"
+              {...form.register("phone")}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              type="email"
+              placeholder="cliente@example.com"
+              {...form.register("email")}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Endereço</label>
+            <Input
+              placeholder="Rua, número, complemento..."
+              {...form.register("address")}
+            />
+          </div>
+          <Button
+            className="w-full"
+            onClick={onSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Criando...
+              </>
+            ) : (
+              "Criar Cliente"
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
