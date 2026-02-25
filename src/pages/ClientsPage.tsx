@@ -396,7 +396,7 @@ export default function ClientsPage() {
 																		Cliente desde
 																	</p>
 																	<p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-																		{new Date(c.created_at).toLocaleDateString("pt-BR", {
+																		{new Date(c.created_at).toLocaleDateString("EN-us", {
 																			day: "2-digit",
 																			month: "long",
 																			year: "numeric",
@@ -408,7 +408,7 @@ export default function ClientsPage() {
 																		Última atualização
 																	</p>
 																	<p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-																		{new Date(c.updated_at).toLocaleDateString("pt-BR", {
+																		{new Date(c.updated_at).toLocaleDateString("EN-us", {
 																			day: "2-digit",
 																			month: "long",
 																			year: "numeric",
@@ -461,7 +461,7 @@ export default function ClientsPage() {
 																							${Number(order.forced_total || order.total || 0).toFixed(2)}
 																						</TableCell>
 																						<TableCell className="text-xs text-slate-600 dark:text-slate-400">
-																							{new Date(order.created_at).toLocaleDateString("pt-BR", {
+																							{new Date(order.created_at).toLocaleDateString("EN-us", {
 																								day: "2-digit",
 																								month: "short",
 																								year: "numeric",

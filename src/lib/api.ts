@@ -7,13 +7,6 @@ const API_BASE_URL = import.meta.env.DEV
   ? '/api'
   : (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000');
 
-if (import.meta.env.DEV) {
-  console.log('🔧 API Configuration:', {
-    mode: import.meta.env.MODE,
-    API_BASE_URL,
-  });
-}
-
 // Create axios instance with default config
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -69,19 +62,11 @@ apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     // Skip auth for login and refresh
     if (config.url === 'auth/login' || config.url === 'auth/refresh') {
-      if (import.meta.env.DEV) {
-        console.log('📤 Request:', config.method?.toUpperCase(), config.url);
-      }
       return config;
     }
     const token = await ensureValidAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    }
-    if (import.meta.env.DEV) {
-      console.log('📤 Request:', config.method?.toUpperCase(), config.url, {
-        hasAuth: !!config.headers.Authorization,
-      });
     }
     return config;
   },
@@ -90,12 +75,7 @@ apiClient.interceptors.request.use(
 
 // Response interceptor: on 401 try refresh and retry; else reject with ApiError
 apiClient.interceptors.response.use(
-  (response) => {
-    if (import.meta.env.DEV) {
-      console.log('✅ Response:', response.status, response.config.url);
-    }
-    return response;
-  },
+  (response) => response,
   async (error: AxiosError<ApiError>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 

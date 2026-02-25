@@ -350,14 +350,21 @@ export default function ItemsPage() {
 									</div>
 									<div className="space-y-1.5">
 										<label className="text-sm font-medium">Alerta de Estoque Mínimo *</label>
-										<Input
-											type="number"
-											placeholder="Ex: 10"
-											disabled={isLoading}
-											min="0"
-											step="0.01"
-											{...form.register("alert_quantity")}
-										/>
+										<div className="flex items-center gap-2">
+											<Input
+												type="number"
+												placeholder="Ex: 10"
+												disabled={isLoading}
+												min="0"
+												step="0.01"
+												{...form.register("alert_quantity")}
+											/>
+											{form.watch("unit_type") ? (
+												<Badge className={`${getUnitDisplay(form.watch("unit_type") as UnitType).color} border font-semibold whitespace-nowrap`}>
+													{getUnitDisplay(form.watch("unit_type") as UnitType).abbr}
+												</Badge>
+											) : null}
+										</div>
 									</div>
 								</div>
 								<p className="text-xs text-muted-foreground -mt-2">

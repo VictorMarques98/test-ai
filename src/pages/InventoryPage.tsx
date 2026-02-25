@@ -597,7 +597,7 @@ export default function InventoryPage() {
 													</span>
 												</TableCell>
 												<TableCell className="text-muted-foreground text-sm">
-													{item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '—'}
+													{item.created_at ? new Date(item.created_at).toLocaleDateString('EN-us') : '—'}
 												</TableCell>
 												<TableCell className="text-right">
 													<div className="flex items-center justify-end gap-1">
@@ -636,7 +636,7 @@ export default function InventoryPage() {
 																	<div className="space-y-1">
 																		<p className="text-xs text-muted-foreground font-medium">Quantidade Disponível</p>
 																		<p className="text-2xl font-bold text-green-600 dark:text-green-500">
-																			{itemStock.quantity.toLocaleString('pt-BR', { 
+																			{itemStock.quantity.toLocaleString('EN-us', { 
 																				minimumFractionDigits: getUnitDisplay(item.unit_type).decimals,
 																				maximumFractionDigits: getUnitDisplay(item.unit_type).decimals
 																			})}
@@ -650,7 +650,7 @@ export default function InventoryPage() {
 																	<div className="space-y-1">
 																		<p className="text-xs text-muted-foreground font-medium">Quantidade Reservada</p>
 																		<p className="text-2xl font-bold text-amber-600 dark:text-amber-500">
-																			{itemStock.reserved_quantity.toLocaleString('pt-BR', { 
+																			{itemStock.reserved_quantity.toLocaleString('EN-us', { 
 																				minimumFractionDigits: getUnitDisplay(item.unit_type).decimals,
 																				maximumFractionDigits: getUnitDisplay(item.unit_type).decimals
 																			})}
@@ -666,7 +666,7 @@ export default function InventoryPage() {
 																		<p className="text-2xl font-bold">
 																			{itemStock.alert_quantity !== null ? (
 																				<>
-																					{itemStock.alert_quantity.toLocaleString('pt-BR', { 
+																					{itemStock.alert_quantity.toLocaleString('EN-us', { 
 																						minimumFractionDigits: getUnitDisplay(item.unit_type).decimals,
 																						maximumFractionDigits: getUnitDisplay(item.unit_type).decimals
 																					})}

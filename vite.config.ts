@@ -58,5 +58,9 @@ export default defineConfig(({ mode }) => ({
 	build: {
 		outDir: "dist",
 		emptyOutDir: true,
+		sourcemap: false, // Disable source maps to avoid console warnings
+	},
+	optimizeDeps: {
+		include: ['react', 'react-dom'],
 	},
 }));
