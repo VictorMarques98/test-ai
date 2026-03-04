@@ -14,6 +14,7 @@ export type {
 	UpdateStockDto,
 	Order,
 	CreateOrderDto,
+	UpdateOrderDto,
 	UpdateOrderStatusDto,
 	OrderItem,
 	OrderProduct,

@@ -67,6 +67,7 @@ export default function OrdersPage() {
     fetchOrders,
     fetchProducts,
     createOrder,
+    updateOrder,
     updateOrderStatus,
     clearError,
   } = useRestaurantStore();
@@ -77,8 +78,10 @@ export default function OrdersPage() {
   >([]);
   const [customerId, setCustomerId] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [shipping, setShipping] = useState<string>("");
   const [forcedTotal, setForcedTotal] = useState<string>("");
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [originalProductIds, setOriginalProductIds] = useState<string[]>([]);
   const [submitMessage, setSubmitMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -190,7 +193,7 @@ export default function OrdersPage() {
     }
   }, [error, clearError]);
 
-  // Auto-calculate total when products change
+  // Auto-calculate total when products or shipping change
   useEffect(() => {
     if (selectedProducts.length > 0) {
       const productsArray: string[] = [];
@@ -200,11 +203,12 @@ export default function OrdersPage() {
         }
       });
       const calculatedTotal = calculateOrderTotal(productsArray);
-      setForcedTotal(calculatedTotal.toFixed(2));
+      const shippingValue = Number(shipping) || 0;
+      setForcedTotal((calculatedTotal + shippingValue).toFixed(2));
     } else {
       setForcedTotal("");
     }
-  }, [selectedProducts, products]);
+  }, [selectedProducts, products, shipping]);
 
   const addItem = () => {
     if (products.length === 0) return;
@@ -225,6 +229,30 @@ export default function OrdersPage() {
 
   const removeItem = (idx: number) =>
     setSelectedProducts(selectedProducts.filter((_, i) => i !== idx));
+
+  // Open the edit modal pre-filled with the given order's data
+  const handleEditOrder = (order: any) => {
+    const productMap = new Map<string, number>();
+    (order.products as any[])?.forEach((p: any) => {
+      const qty = Number(p.quantity || 1);
+      productMap.set(p.id, (productMap.get(p.id) || 0) + qty);
+    });
+    setSelectedProducts(
+      Array.from(productMap.entries()).map(([productId, quantity]) => ({ productId, quantity }))
+    );
+    // Build original flat array for diff calculation on submit
+    const origFlat: string[] = [];
+    (order.products as any[])?.forEach((p: any) => {
+      const qty = Number(p.quantity || 1);
+      for (let i = 0; i < qty; i++) origFlat.push(p.id);
+    });
+    setOriginalProductIds(origFlat);
+    setCustomerId(order.customerId || order.customer_id || "");
+    setNotes(order.notes || "");
+    setShipping(order.shipping != null ? String(order.shipping) : "");
+    setEditingOrderId(order.id);
+    setOpen(true);
+  };
 
   const handleSubmit = async () => {
     if (selectedProducts.length === 0) {
@@ -249,18 +277,58 @@ export default function OrdersPage() {
       const data = {
         customerId:
           customerId && customerId !== "none" ? customerId : undefined,
+        shipping: shipping ? Number(shipping) : undefined,
         forced_total: forcedTotal ? Number(forcedTotal) : undefined,
         notes: notes.trim() || undefined,
         products: productsArray,
       };
 
       if (editingOrderId) {
-        // Backend doesn't support editing orders, so we show a message
-        setSubmitMessage({
-          type: "error",
-          text: "Edição de pedidos não suportada pelo backend ainda",
+        // Compute diff vs original products
+        const oldCounts = new Map<string, number>();
+        originalProductIds.forEach((id) => oldCounts.set(id, (oldCounts.get(id) || 0) + 1));
+        const newCounts = new Map<string, number>();
+        productsArray.forEach((id) => newCounts.set(id, (newCounts.get(id) || 0) + 1));
+
+        const productsRemoved: string[] = [];
+        const productsAdd: string[] = [];
+
+        oldCounts.forEach((oldCount, productId) => {
+          const newCount = newCounts.get(productId) || 0;
+          if (newCount < oldCount) {
+            productsRemoved.push(productId);
+            for (let i = 0; i < newCount; i++) productsAdd.push(productId);
+          } else if (newCount > oldCount) {
+            for (let i = 0; i < newCount - oldCount; i++) productsAdd.push(productId);
+          }
         });
-        return;
+        newCounts.forEach((newCount, productId) => {
+          if (!oldCounts.has(productId)) {
+            for (let i = 0; i < newCount; i++) productsAdd.push(productId);
+          }
+        });
+
+        await updateOrder(editingOrderId, {
+          customerId: customerId && customerId !== "none" ? customerId : null,
+          shipping: shipping ? Number(shipping) : undefined,
+          total: forcedTotal ? Number(forcedTotal) : undefined,
+          notes: notes.trim() || undefined,
+          productsAdd: productsAdd.length > 0 ? productsAdd : undefined,
+          productsRemoved: productsRemoved.length > 0 ? productsRemoved : undefined,
+        });
+        setSubmitMessage({ type: "success", text: "Pedido atualizado com sucesso!" });
+        setTimeout(() => {
+          setSelectedProducts([]);
+          setCustomerId("");
+          setNotes("");
+          setShipping("");
+          setForcedTotal("");
+          setEditingOrderId(null);
+          setOriginalProductIds([]);
+          setSubmitMessage(null);
+          setOpen(false);
+          fetchOrders();
+        }, 1500);
       } else {
         await createOrder(data);
         setSubmitMessage({
@@ -271,8 +339,10 @@ export default function OrdersPage() {
           setSelectedProducts([]);
           setCustomerId("");
           setNotes("");
+          setShipping("");
           setForcedTotal("");
           setEditingOrderId(null);
+          setOriginalProductIds([]);
           setSubmitMessage(null);
           setOpen(false);
         }, 1500);
@@ -499,8 +569,10 @@ export default function OrdersPage() {
                 setSelectedProducts([]);
                 setCustomerId("");
                 setNotes("");
+                setShipping("");
                 setForcedTotal("");
                 setEditingOrderId(null);
+                setOriginalProductIds([]);
               }
             }}
           >
@@ -583,6 +655,17 @@ export default function OrdersPage() {
                     placeholder="Adicione observações ou instruções especiais..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Frete / Entrega ($) (opcional)</label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                    value={shipping}
+                    onChange={(e) => setShipping(e.target.value)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -688,6 +771,18 @@ export default function OrdersPage() {
                                 produto ou ${discountInfo.totalDiscount.toFixed(2)} no total
                               </p>
                             </div>
+                          </div>
+                        )}
+                        {Number(shipping) > 0 && (
+                          <div className="flex items-center justify-between text-sm px-1">
+                            <span className="text-muted-foreground">Subtotal dos produtos:</span>
+                            <span className="font-medium">${(discountInfo?.discountedPrice ?? discountInfo?.originalPrice ?? 0).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {Number(shipping) > 0 && (
+                          <div className="flex items-center justify-between text-sm px-1">
+                            <span className="text-muted-foreground">Frete:</span>
+                            <span className="font-medium">+${Number(shipping).toFixed(2)}</span>
                           </div>
                         )}
                         <div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
@@ -1055,16 +1150,39 @@ export default function OrdersPage() {
                         ),
                       )}
                     </div>
-                    <div className="mt-4 pt-3 border-t-2 border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Total:
-                      </span>
-                      <span className="text-xl font-bold text-primary">
-                        $
-                        {Array.from(productMap.values())
-                          .reduce((sum, p) => sum + p.price * p.quantity, 0)
-                          .toFixed(2)}
-                      </span>
+                    <div className="mt-4 pt-3 border-t-2 border-slate-200 dark:border-slate-700 space-y-1.5">
+                      {Number(o.shipping) > 0 && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>Subtotal produtos:</span>
+                          <span>
+                            ${Array.from(productMap.values())
+                              .reduce((sum, p) => sum + p.price * p.quantity, 0)
+                              .toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {Number(o.shipping) > 0 && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>Frete:</span>
+                          <span>+${Number(o.shipping).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Total:
+                        </span>
+                        <span className="text-xl font-bold text-primary">
+                          $
+                          {o.total != null
+                            ? Number(o.total).toFixed(2)
+                            : (
+                                Array.from(productMap.values()).reduce(
+                                  (sum, p) => sum + p.price * p.quantity,
+                                  0,
+                                ) + (Number(o.shipping) || 0)
+                              ).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1095,6 +1213,15 @@ export default function OrdersPage() {
                     )}
                     {o.status === "in_progress" && (
                       <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditOrder(o)}
+                          className="bg-purple-50 border-purple-600 text-purple-700 hover:bg-purple-100 hover:border-purple-700 hover:text-purple-800"
+                        >
+                          <ClipboardList className="w-3 h-3 mr-1" />
+                          Editar
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"

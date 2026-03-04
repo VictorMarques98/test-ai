@@ -100,9 +100,19 @@ export type OrderStatus = 'request' | 'in_progress' | 'refuse' | 'canceled' | 'f
 
 export interface CreateOrderDto {
   customerId?: string | null; // UUID reference to customer
+  shipping?: number; // Optional shipping fee
   forced_total?: number; // If provided, this value is used as the order total instead of calculating from product prices
   notes?: string | null;
   products: string[]; // Array of product IDs
+}
+
+export interface UpdateOrderDto {
+  customerId?: string | null;
+  shipping?: number; // Optional shipping fee
+  productsAdd?: string[]; // Product IDs to add (repeating = multiple units)
+  productsRemoved?: string[]; // Product IDs to remove (removes ALL lines of each)
+  notes?: string | null;
+  total?: number; // Order total override
 }
 
 export interface UpdateOrderStatusDto {
@@ -143,6 +153,8 @@ export interface Order {
   id: string;
   customerId?: string | null; // UUID reference to customer
   notes?: string | null;
+  shipping?: number; // Shipping fee
+  total?: number; // Order total
   products?: OrderProduct[]; // Array of embedded product objects
   status: OrderStatus;
   created_at: string;
