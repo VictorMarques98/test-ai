@@ -1075,7 +1075,7 @@ export default function OrdersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
           {sortedOrders.map((o) => {
             // Skip invalid orders
             if (!o || !o.id) return null;
@@ -1398,21 +1398,22 @@ export default function OrdersPage() {
               <div className="flex items-center gap-2">
                 <Printer className="w-5 h-5 text-primary" />
                 <span className="font-semibold">
-                  {selectedOrderIds.size} order
-                  {selectedOrderIds.size > 1 ? "s" : ""} selected
+                  {selectedOrderIds.size} pedido
+                  {selectedOrderIds.size > 1 ? "s" : ""} selecionado
+                  {selectedOrderIds.size > 1 ? "s" : ""}
                 </span>
               </div>
               <button
                 onClick={selectAllVisible}
                 className="text-sm text-slate-300 hover:text-white underline underline-offset-2"
               >
-                Select all ({sortedOrders.length})
+                Selecionar todos ({sortedOrders.length})
               </button>
               <button
                 onClick={clearSelection}
                 className="text-sm text-slate-300 hover:text-white underline underline-offset-2"
               >
-                Clear
+                Limpar seleção
               </button>
             </div>
             <Button

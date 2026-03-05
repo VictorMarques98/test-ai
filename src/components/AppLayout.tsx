@@ -37,7 +37,7 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen max-h-screen">
       <aside className="w-64 bg-card border-r border-border p-6 hidden md:flex flex-col">
         <div className="mb-6 flex justify-center">
           <img src="/logo.png" alt="Thaina Pty" className="h-auto max-w-36" />
