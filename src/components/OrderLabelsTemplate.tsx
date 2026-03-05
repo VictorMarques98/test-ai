@@ -85,7 +85,7 @@ export const OrderLabelsTemplate = forwardRef<HTMLDivElement, OrderLabelsTemplat
 						display: flex;
 						align-items: center;
 						justify-content: center;
-						min-height: 60px;
+						min-height: 15mm;
 					}
 
 					.meta-row {
@@ -143,7 +143,7 @@ export const OrderLabelsTemplate = forwardRef<HTMLDivElement, OrderLabelsTemplat
 						body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 						.print-container { width: 100%; }
 						.meal-label { padding: 4mm; height: 70mm; page-break-inside: avoid; }
-						.label-logo { width: 28mm; margin-bottom: 2mm; }
+						.label-logo { width: 20mm; margin-bottom: 2mm; }
 						.product-wrapper { font-size: 11pt; padding: 2mm 3mm; border-radius: 2mm; margin-bottom: 2mm; }
 						.meta-row { padding: 1.5mm 0; }
 						.meta-chip { font-size: 7.5pt; }
