@@ -552,7 +552,7 @@ export default function DishesPage() {
                           {product.description}
                         </p>
                       )}
-                      <div className="flex gap-3 mt-3 text-sm">
+                      <div className="flex flex-col gap-2 mt-3 text-sm">
                         {product.price && (
                           <span className="text-muted-foreground">
                             Preço de venda (unidade):{" "}
@@ -577,7 +577,7 @@ export default function DishesPage() {
                   <p className="text-xs font-medium text-muted-foreground mb-2 uppercase">
                     Ingredientes
                   </p>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {(product.product_items || []).length === 0 ? (
                       <p className="text-xs text-muted-foreground italic">
                         Nenhum ingrediente

@@ -12,6 +12,7 @@ import {
 	CreateStockDto,
 	UpdateStockDto,
 	CreateOrderDto,
+	UpdateOrderDto,
 	UpdateOrderStatusDto,
 	StockWithItem,
 	ProductWithItems,
@@ -56,6 +57,7 @@ interface RestaurantStore {
 	// Orders actions
 	fetchOrders: () => Promise<void>;
 	createOrder: (data: CreateOrderDto) => Promise<Order>;
+	updateOrder: (id: string, data: UpdateOrderDto) => Promise<Order>;
 	updateOrderStatus: (id: string, status: UpdateOrderStatusDto['status']) => Promise<void>;
 
 	// Clients actions (still local until backend supports it)
@@ -296,6 +298,21 @@ export const useRestaurantStore = create<RestaurantStore>((set, get) => ({
 			}));
 		} catch (error: any) {
 			set({ error: error.message || 'Failed to update order status', isLoading: false });
+			throw error;
+		}
+	},
+
+	updateOrder: async (id: string, data: UpdateOrderDto) => {
+		set({ isLoading: true, error: null });
+		try {
+			const updatedOrder = await ordersService.update(id, data);
+			set((state) => ({
+				orders: state.orders.map((order) => order.id === id ? updatedOrder : order),
+				isLoading: false,
+			}));
+			return updatedOrder;
+		} catch (error: any) {
+			set({ error: error.message || 'Failed to update order', isLoading: false });
 			throw error;
 		}
 	},

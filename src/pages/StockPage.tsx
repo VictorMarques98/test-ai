@@ -691,7 +691,6 @@ export default function StockPage() {
 											<TableHead className="font-bold">Descrição</TableHead>
 											<TableHead className="font-bold">Tipo de Unidade</TableHead>
 											<TableHead className="font-bold text-right">Disponível</TableHead>
-											<TableHead className="font-bold text-right">Reservado</TableHead>
 											<TableHead className="font-bold text-right">Alerta</TableHead>
 												<TableHead className="text-right font-bold">Ações</TableHead>
 											</TableRow>
@@ -735,18 +734,6 @@ export default function StockPage() {
 																	maximumFractionDigits: unitDisplay.decimals
 																})} {unitDisplay.abbr}
 															</span>
-														</TableCell>
-														<TableCell className="text-right">
-															{s.reserved_quantity > 0 ? (
-																<span className="font-semibold text-amber-600 dark:text-amber-500">
-																	{Number(s.reserved_quantity).toLocaleString('EN-us', { 
-																		minimumFractionDigits: unitDisplay.decimals,
-																		maximumFractionDigits: unitDisplay.decimals
-																	})} {unitDisplay.abbr}
-																</span>
-															) : (
-																<span className="text-muted-foreground/50">-</span>
-															)}
 														</TableCell>
 														<TableCell className="text-right">
 															{s.alert_quantity !== null ? (

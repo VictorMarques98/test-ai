@@ -24,6 +24,7 @@ import {
   AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  CheckSquare2,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -32,6 +33,7 @@ import {
   Plus,
   Printer,
   ShoppingCart,
+  Square,
   UserPlus,
   X,
   XCircle,
@@ -41,6 +43,7 @@ import { useLocation } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import { OrderLabelsTemplate } from "@/components/OrderLabelsTemplate";
+import { BulkOrderLabelsTemplate } from "@/components/BulkOrderLabelsTemplate";
 import { useForm } from "react-hook-form";
 
 type CreateClientFormValues = {
@@ -67,18 +70,25 @@ export default function OrdersPage() {
     fetchOrders,
     fetchProducts,
     createOrder,
+    updateOrder,
     updateOrderStatus,
     clearError,
   } = useRestaurantStore();
-  const { customers, createCustomer: hookCreateCustomer, fetchCustomers } = useCustomers();
+  const {
+    customers,
+    createCustomer: hookCreateCustomer,
+    fetchCustomers,
+  } = useCustomers();
   const [open, setOpen] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<
     { productId: string; quantity: number }[]
   >([]);
   const [customerId, setCustomerId] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [shipping, setShipping] = useState<string>("");
   const [forcedTotal, setForcedTotal] = useState<string>("");
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [originalProductIds, setOriginalProductIds] = useState<string[]>([]);
   const [submitMessage, setSubmitMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -101,6 +111,26 @@ export default function OrdersPage() {
   // Print states
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Bulk print states
+  const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const bulkPrintRef = useRef<HTMLDivElement>(null);
+
+  const toggleOrderSelection = (id: string) => {
+    setSelectedOrderIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () =>
+    setSelectedOrderIds(new Set(sortedOrders.map((o) => o.id)));
+
+  const clearSelection = () => setSelectedOrderIds(new Set());
 
   // Create new customer function
   const handleCreateCustomer = async () => {
@@ -136,7 +166,14 @@ export default function OrdersPage() {
     }
   };
 
-  // Print handler
+  // Bulk print handler
+  const handleBulkPrint = useReactToPrint({
+    contentRef: bulkPrintRef,
+    documentTitle: `Bulk-Print-${selectedOrderIds.size}-orders`,
+    onAfterPrint: () => clearSelection(),
+  });
+
+  // Single-order print handler
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Pedido-${orderToPrint?.id.substring(0, 8).toUpperCase()}`,
@@ -190,7 +227,7 @@ export default function OrdersPage() {
     }
   }, [error, clearError]);
 
-  // Auto-calculate total when products change
+  // Auto-calculate total when products or shipping change
   useEffect(() => {
     if (selectedProducts.length > 0) {
       const productsArray: string[] = [];
@@ -200,11 +237,12 @@ export default function OrdersPage() {
         }
       });
       const calculatedTotal = calculateOrderTotal(productsArray);
-      setForcedTotal(calculatedTotal.toFixed(2));
+      const shippingValue = Number(shipping) || 0;
+      setForcedTotal((calculatedTotal + shippingValue).toFixed(2));
     } else {
       setForcedTotal("");
     }
-  }, [selectedProducts, products]);
+  }, [selectedProducts, products, shipping]);
 
   const addItem = () => {
     if (products.length === 0) return;
@@ -225,6 +263,33 @@ export default function OrdersPage() {
 
   const removeItem = (idx: number) =>
     setSelectedProducts(selectedProducts.filter((_, i) => i !== idx));
+
+  // Open the edit modal pre-filled with the given order's data
+  const handleEditOrder = (order: any) => {
+    const productMap = new Map<string, number>();
+    (order.products as any[])?.forEach((p: any) => {
+      const qty = Number(p.quantity || 1);
+      productMap.set(p.id, (productMap.get(p.id) || 0) + qty);
+    });
+    setSelectedProducts(
+      Array.from(productMap.entries()).map(([productId, quantity]) => ({
+        productId,
+        quantity,
+      })),
+    );
+    // Build original flat array for diff calculation on submit
+    const origFlat: string[] = [];
+    (order.products as any[])?.forEach((p: any) => {
+      const qty = Number(p.quantity || 1);
+      for (let i = 0; i < qty; i++) origFlat.push(p.id);
+    });
+    setOriginalProductIds(origFlat);
+    setCustomerId(order.customerId || order.customer_id || "");
+    setNotes(order.notes || "");
+    setShipping(order.shipping != null ? String(order.shipping) : "");
+    setEditingOrderId(order.id);
+    setOpen(true);
+  };
 
   const handleSubmit = async () => {
     if (selectedProducts.length === 0) {
@@ -249,18 +314,67 @@ export default function OrdersPage() {
       const data = {
         customerId:
           customerId && customerId !== "none" ? customerId : undefined,
+        shipping: shipping ? Number(shipping) : undefined,
         forced_total: forcedTotal ? Number(forcedTotal) : undefined,
         notes: notes.trim() || undefined,
         products: productsArray,
       };
 
       if (editingOrderId) {
-        // Backend doesn't support editing orders, so we show a message
-        setSubmitMessage({
-          type: "error",
-          text: "Edição de pedidos não suportada pelo backend ainda",
+        // Compute diff vs original products
+        const oldCounts = new Map<string, number>();
+        originalProductIds.forEach((id) =>
+          oldCounts.set(id, (oldCounts.get(id) || 0) + 1),
+        );
+        const newCounts = new Map<string, number>();
+        productsArray.forEach((id) =>
+          newCounts.set(id, (newCounts.get(id) || 0) + 1),
+        );
+
+        const productsRemoved: string[] = [];
+        const productsAdd: string[] = [];
+
+        oldCounts.forEach((oldCount, productId) => {
+          const newCount = newCounts.get(productId) || 0;
+          if (newCount < oldCount) {
+            productsRemoved.push(productId);
+            for (let i = 0; i < newCount; i++) productsAdd.push(productId);
+          } else if (newCount > oldCount) {
+            for (let i = 0; i < newCount - oldCount; i++)
+              productsAdd.push(productId);
+          }
         });
-        return;
+        newCounts.forEach((newCount, productId) => {
+          if (!oldCounts.has(productId)) {
+            for (let i = 0; i < newCount; i++) productsAdd.push(productId);
+          }
+        });
+
+        await updateOrder(editingOrderId, {
+          customerId: customerId && customerId !== "none" ? customerId : null,
+          shipping: shipping ? Number(shipping) : undefined,
+          total: forcedTotal ? Number(forcedTotal) : undefined,
+          notes: notes.trim() || undefined,
+          productsAdd: productsAdd.length > 0 ? productsAdd : undefined,
+          productsRemoved:
+            productsRemoved.length > 0 ? productsRemoved : undefined,
+        });
+        setSubmitMessage({
+          type: "success",
+          text: "Pedido atualizado com sucesso!",
+        });
+        setTimeout(() => {
+          setSelectedProducts([]);
+          setCustomerId("");
+          setNotes("");
+          setShipping("");
+          setForcedTotal("");
+          setEditingOrderId(null);
+          setOriginalProductIds([]);
+          setSubmitMessage(null);
+          setOpen(false);
+          fetchOrders();
+        }, 1500);
       } else {
         await createOrder(data);
         setSubmitMessage({
@@ -271,8 +385,10 @@ export default function OrdersPage() {
           setSelectedProducts([]);
           setCustomerId("");
           setNotes("");
+          setShipping("");
           setForcedTotal("");
           setEditingOrderId(null);
+          setOriginalProductIds([]);
           setSubmitMessage(null);
           setOpen(false);
         }, 1500);
@@ -368,9 +484,9 @@ export default function OrdersPage() {
     }
     // Otherwise try to find customer by ID
     const customerId = order.customer_id || order.customerId;
-    if (!customerId) return "Cliente não informado";
+    if (!customerId) return "-";
     const customer = customers.find((c) => c.id === customerId);
-    return customer?.name || "Cliente não encontrado";
+    return customer?.name || "-";
   };
 
   const statusColor = (s: string) => {
@@ -425,7 +541,7 @@ export default function OrdersPage() {
     // Prioritize "in_progress" orders first
     if (a.status === "in_progress" && b.status !== "in_progress") return -1;
     if (a.status !== "in_progress" && b.status === "in_progress") return 1;
-    
+
     // Then sort by creation date (newest first)
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
@@ -475,7 +591,7 @@ export default function OrdersPage() {
   }, [orders]);
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${selectedOrderIds.size > 0 ? "pb-24" : ""}`}>
       {/* Header Section */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-900 dark:to-black rounded-lg p-6 shadow-lg">
         <div className="flex items-center justify-between">
@@ -499,8 +615,10 @@ export default function OrdersPage() {
                 setSelectedProducts([]);
                 setCustomerId("");
                 setNotes("");
+                setShipping("");
                 setForcedTotal("");
                 setEditingOrderId(null);
+                setOriginalProductIds([]);
               }
             }}
           >
@@ -583,6 +701,19 @@ export default function OrdersPage() {
                     placeholder="Adicione observações ou instruções especiais..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">
+                    Frete / Entrega ($) (opcional)
+                  </label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                    value={shipping}
+                    onChange={(e) => setShipping(e.target.value)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -677,17 +808,43 @@ export default function OrdersPage() {
                             </div>
                             <div className="text-sm text-green-700 dark:text-green-400 space-y-0.5 ml-6">
                               <p>
-                                <strong>Preço original:{" "}</strong>
+                                <strong>Preço original: </strong>
                                 <span className="line-through">
                                   ${discountInfo.originalPrice.toFixed(2)}
                                 </span>
                               </p>
-                               <p>
+                              <p>
                                 <strong>Desconto: </strong>$
                                 {discountInfo.discountPerProduct.toFixed(2)} por
-                                produto ou ${discountInfo.totalDiscount.toFixed(2)} no total
+                                produto ou $
+                                {discountInfo.totalDiscount.toFixed(2)} no total
                               </p>
                             </div>
+                          </div>
+                        )}
+                        {Number(shipping) > 0 && (
+                          <div className="flex items-center justify-between text-sm px-1">
+                            <span className="text-muted-foreground">
+                              Subtotal dos produtos:
+                            </span>
+                            <span className="font-medium">
+                              $
+                              {(
+                                discountInfo?.discountedPrice ??
+                                discountInfo?.originalPrice ??
+                                0
+                              ).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {Number(shipping) > 0 && (
+                          <div className="flex items-center justify-between text-sm px-1">
+                            <span className="text-muted-foreground">
+                              Frete:
+                            </span>
+                            <span className="font-medium">
+                              +${Number(shipping).toFixed(2)}
+                            </span>
                           </div>
                         )}
                         <div className="flex items-center justify-between py-3 px-4 bg-slate-100 dark:bg-slate-800 rounded-lg border-2 border-slate-300 dark:border-slate-700">
@@ -918,7 +1075,7 @@ export default function OrdersPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
           {sortedOrders.map((o) => {
             // Skip invalid orders
             if (!o || !o.id) return null;
@@ -968,19 +1125,58 @@ export default function OrdersPage() {
             }
 
             return (
-              <Card key={o.id} className="overflow-hidden flex flex-col">
+              <Card
+                key={o.id}
+                className={`overflow-hidden flex flex-col transition-all ${selectedOrderIds.has(o.id) ? "ring-2 ring-primary ring-offset-2" : ""}`}
+              >
                 <CardContent className="p-0 flex flex-col h-full">
                   {/* Header Section */}
                   <div className="flex items-center justify-between p-5 bg-gradient-to-r from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900 border-b-2 border-slate-300 dark:border-slate-700">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-widest">
-                        Pedido #{o.id.slice(0, 8)}
-                      </span>
-                      <span className="text-base font-bold text-slate-900 dark:text-slate-100">
-                        {getCustomerName(o)}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      {/* Bulk-select checkbox */}
+                      <button
+                        onClick={() => toggleOrderSelection(o.id)}
+                        className={`flex-shrink-0 w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                          selectedOrderIds.has(o.id)
+                            ? "bg-primary text-primary-foreground"
+                            : "border-2 border-slate-400 text-transparent hover:border-primary"
+                        }`}
+                        title={
+                          selectedOrderIds.has(o.id)
+                            ? "Deselect order"
+                            : "Select for bulk print"
+                        }
+                      >
+                        {selectedOrderIds.has(o.id) ? (
+                          <CheckSquare2 className="w-4 h-4" />
+                        ) : (
+                          <Square className="w-4 h-4 opacity-0 group-hover:opacity-50" />
+                        )}
+                      </button>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-bold text-slate-600 dark:text-slate-400 font-mono uppercase tracking-widest">
+                          Pedido #{o.id.slice(0, 8)}
+                        </span>
+                        <span className="text-base font-bold text-slate-900 dark:text-slate-100">
+                          {getCustomerName(o)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col items-end gap-2">
+                        <Badge
+                          variant={statusColor(o.status)}
+                          className={`capitalize font-bold text-xs px-3 py-1 ${
+                            o.status === "request"
+                              ? "bg-yellow-100 text-yellow-900 border-yellow-400 hover:bg-yellow-100"
+                              : o.status === "in_progress"
+                                ? "bg-blue-100 text-blue-900 border-blue-400 hover:bg-blue-100"
+                                : o.status === "finish"
+                                  ? "bg-green-100 text-green-900 border-green-400 hover:bg-green-100"
+                                  : "bg-red-100 text-red-900 border-red-400 hover:bg-red-100"
+                          }`}
+                        >
+                          {statusLabel(o.status)}
+                        </Badge>
                       <span className="text-sm font-semibold text-slate-800 dark:text-slate-300">
                         {new Date(o.created_at).toLocaleDateString("EN-us", {
                           day: "2-digit",
@@ -990,20 +1186,6 @@ export default function OrdersPage() {
                           minute: "2-digit",
                         })}
                       </span>
-                      <Badge
-                        variant={statusColor(o.status)}
-                        className={`capitalize font-bold text-xs px-3 py-1 ${
-                          o.status === "request"
-                            ? "bg-yellow-100 text-yellow-900 border-yellow-400 hover:bg-yellow-100"
-                            : o.status === "in_progress"
-                              ? "bg-blue-100 text-blue-900 border-blue-400 hover:bg-blue-100"
-                              : o.status === "finish"
-                                ? "bg-green-100 text-green-900 border-green-400 hover:bg-green-100"
-                                : "bg-red-100 text-red-900 border-red-400 hover:bg-red-100"
-                        }`}
-                      >
-                        {statusLabel(o.status)}
-                      </Badge>
                     </div>
                   </div>
 
@@ -1055,16 +1237,40 @@ export default function OrdersPage() {
                         ),
                       )}
                     </div>
-                    <div className="mt-4 pt-3 border-t-2 border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                        Total:
-                      </span>
-                      <span className="text-xl font-bold text-primary">
-                        $
-                        {Array.from(productMap.values())
-                          .reduce((sum, p) => sum + p.price * p.quantity, 0)
-                          .toFixed(2)}
-                      </span>
+                    <div className="mt-4 pt-3 border-t-2 border-slate-200 dark:border-slate-700 space-y-1.5">
+                      {Number(o.shipping) > 0 && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>Subtotal produtos:</span>
+                          <span>
+                            $
+                            {Array.from(productMap.values())
+                              .reduce((sum, p) => sum + p.price * p.quantity, 0)
+                              .toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {Number(o.shipping) > 0 && (
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>Frete:</span>
+                          <span>+${Number(o.shipping).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                          Total:
+                        </span>
+                        <span className="text-xl font-bold text-primary">
+                          $
+                          {o.total != null
+                            ? Number(o.total).toFixed(2)
+                            : (
+                                Array.from(productMap.values()).reduce(
+                                  (sum, p) => sum + p.price * p.quantity,
+                                  0,
+                                ) + (Number(o.shipping) || 0)
+                              ).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -1095,6 +1301,15 @@ export default function OrdersPage() {
                     )}
                     {o.status === "in_progress" && (
                       <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEditOrder(o)}
+                          className="bg-purple-50 border-purple-600 text-purple-700 hover:bg-purple-100 hover:border-purple-700 hover:text-purple-800"
+                        >
+                          <ClipboardList className="w-3 h-3 mr-1" />
+                          Editar
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -1154,7 +1369,7 @@ export default function OrdersPage() {
           })}
         </div>
       )}
-      {/* Hidden print template */}
+      {/* Hidden single-order print template */}
       {orderToPrint && (
         <div style={{ display: "none" }}>
           <OrderLabelsTemplate
@@ -1162,6 +1377,53 @@ export default function OrdersPage() {
             order={orderToPrint}
             customerName={getCustomerName(orderToPrint)}
           />
+        </div>
+      )}
+
+      {/* Hidden bulk print template */}
+      {selectedOrderIds.size > 0 && (
+        <div style={{ display: "none" }}>
+          <BulkOrderLabelsTemplate
+            ref={bulkPrintRef}
+            orders={orders.filter((o) => selectedOrderIds.has(o.id))}
+          />
+        </div>
+      )}
+
+      {/* Bulk print sticky action bar */}
+      {selectedOrderIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900 text-white shadow-2xl border-t-2 border-primary">
+          <div className="max-w-screen-xl mx-auto px-6 py-3 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Printer className="w-5 h-5 text-primary" />
+                <span className="font-semibold">
+                  {selectedOrderIds.size} pedido
+                  {selectedOrderIds.size > 1 ? "s" : ""} selecionado
+                  {selectedOrderIds.size > 1 ? "s" : ""}
+                </span>
+              </div>
+              <button
+                onClick={selectAllVisible}
+                className="text-sm text-slate-300 hover:text-white underline underline-offset-2"
+              >
+                Selecionar todos ({sortedOrders.length})
+              </button>
+              <button
+                onClick={clearSelection}
+                className="text-sm text-slate-300 hover:text-white underline underline-offset-2"
+              >
+                Limpar seleção
+              </button>
+            </div>
+            <Button
+              onClick={() => handleBulkPrint()}
+              className="bg-primary hover:bg-primary/80 text-white font-bold px-6"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimir pedidos ({selectedOrderIds.size})
+            </Button>
+          </div>
         </div>
       )}
       {/* New Customer Modal */}
@@ -1199,17 +1461,11 @@ function NewCustomerModal({
         <div className="space-y-4 mt-4">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Nome *</label>
-            <Input
-              placeholder="Nome do cliente"
-              {...form.register("name")}
-            />
+            <Input placeholder="Nome do cliente" {...form.register("name")} />
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Telefone</label>
-            <Input
-              placeholder="(11) 99999-9999"
-              {...form.register("phone")}
-            />
+            <Input placeholder="(11) 99999-9999" {...form.register("phone")} />
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Email</label>
@@ -1226,11 +1482,7 @@ function NewCustomerModal({
               {...form.register("address")}
             />
           </div>
-          <Button
-            className="w-full"
-            onClick={onSubmit}
-            disabled={isSubmitting}
-          >
+          <Button className="w-full" onClick={onSubmit} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

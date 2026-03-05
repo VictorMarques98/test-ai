@@ -1,5 +1,5 @@
 import apiClient from '@/lib/api';
-import { Order, CreateOrderDto, UpdateOrderStatusDto } from '@/types/api';
+import { Order, CreateOrderDto, UpdateOrderDto, UpdateOrderStatusDto } from '@/types/api';
 
 /**
  * Orders Service
@@ -28,6 +28,15 @@ export const ordersService = {
    */
   async create(data: CreateOrderDto): Promise<Order> {
     const response = await apiClient.post<Order>('/orders', data);
+    return response.data;
+  },
+
+  /**
+   * Update order (only when status is in_progress)
+   * Use productsAdd to add products, productsRemoved to remove products
+   */
+  async update(id: string, data: UpdateOrderDto): Promise<Order> {
+    const response = await apiClient.patch<Order>(`/orders/${id}`, data);
     return response.data;
   },
 
