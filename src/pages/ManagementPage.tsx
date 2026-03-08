@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -54,6 +55,7 @@ import type {
   Tenant,
   User,
   CreateTenantDto,
+  UpdateTenantDto,
   RegisterDto,
   UpdateUserDto,
 } from "@/types/api";
@@ -333,6 +335,23 @@ export default function ManagementPage() {
     });
   };
 
+  const handleToggleBlockSale = async (tenant: Tenant) => {
+    try {
+      const newValue = !tenant.blockSaleWhenOutOfStock;
+      await tenantsService.updateTenant(tenant.id, {
+        blockSaleWhenOutOfStock: newValue,
+      });
+      showSuccessToast(
+        newValue
+          ? "Vendas bloqueadas quando sem estoque ativado"
+          : "Vendas bloqueadas quando sem estoque desativado"
+      );
+      refetchTenants();
+    } catch (err) {
+      showErrorToast((err as Error)?.message ?? "Erro ao atualizar configuração");
+    }
+  };
+
   useEffect(() => {
     if (!isAdmin) navigate("/", { replace: true });
   }, [isAdmin, navigate]);
@@ -510,7 +529,30 @@ export default function ManagementPage() {
                           className="bg-card hover:bg-card"
                         >
                           <TableCell colSpan={5} className="p-6">
-                            <div className="space-y-4">
+                            <div className="space-y-6">
+                              {/* Tenant Settings Section */}
+                              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 bg-slate-50/50 dark:bg-slate-800/30">
+                                <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-4">
+                                  Configurações
+                                </h4>
+                                <div className="flex items-center justify-between">
+                                  <div className="space-y-1">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                      Bloquear vendas quando sem estoque
+                                    </label>
+                                    <p className="text-xs text-muted-foreground">
+                                      Quando ativado, impede a criação de pedidos quando não há estoque suficiente. 
+                                      Quando desativado, permite vendas e o estoque pode ficar negativo.
+                                    </p>
+                                  </div>
+                                  <Switch
+                                    checked={tenant.blockSaleWhenOutOfStock ?? false}
+                                    onCheckedChange={() => handleToggleBlockSale(tenant)}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Users Section */}
                               <div className="flex items-center justify-between flex-wrap gap-2">
                                 <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                                   Usuários ({usersToShow.length})

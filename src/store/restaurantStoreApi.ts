@@ -17,6 +17,7 @@ import {
 	StockWithItem,
 	ProductWithItems,
 	OrderWithItems,
+	PaginationParams,
 } from "@/types/restaurant";
 import type { StockHistoryEntry } from "@/types/backend";
 import itemsService from "@/services/itemsService";
@@ -34,6 +35,14 @@ interface RestaurantStore {
 	clients: Client[];
 	isLoading: boolean;
 	error: string | null;
+	
+	// Pagination state for orders and stock history
+	ordersPage: number;
+	ordersTotalPages: number;
+	ordersTotal: number;
+	stockHistoryPage: number;
+	stockHistoryTotalPages: number;
+	stockHistoryTotal: number;
 
 	// Items actions
 	fetchItems: () => Promise<void>;
@@ -49,13 +58,13 @@ interface RestaurantStore {
 
 	// Stock actions
 	fetchStock: () => Promise<void>;
-	fetchStockHistory: () => Promise<void>;
+	fetchStockHistory: (params?: PaginationParams) => Promise<void>;
 	createStock: (data: CreateStockDto) => Promise<Stock>;
 	updateStock: (id: string, data: UpdateStockDto) => Promise<void>;
 	getStockByItemId: (itemId: string) => Promise<Stock | null>;
 
 	// Orders actions
-	fetchOrders: () => Promise<void>;
+	fetchOrders: (params?: PaginationParams) => Promise<void>;
 	createOrder: (data: CreateOrderDto) => Promise<Order>;
 	updateOrder: (id: string, data: UpdateOrderDto) => Promise<Order>;
 	updateOrderStatus: (id: string, status: UpdateOrderStatusDto['status']) => Promise<void>;
@@ -85,6 +94,12 @@ export const useRestaurantStore = create<RestaurantStore>((set, get) => ({
 	clients: [],
 	isLoading: false,
 	error: null,
+	ordersPage: 1,
+	ordersTotalPages: 1,
+	ordersTotal: 0,
+	stockHistoryPage: 1,
+	stockHistoryTotalPages: 1,
+	stockHistoryTotal: 0,
 
 	// === Items ===
 	fetchItems: async () => {
@@ -239,10 +254,15 @@ export const useRestaurantStore = create<RestaurantStore>((set, get) => ({
 		}
 	},
 
-	fetchStockHistory: async () => {
+	fetchStockHistory: async (params?: PaginationParams) => {
 		try {
-			const history = await stockService.getHistory();
-			set({ stockHistory: history });
+			const response = await stockService.getHistory(params);
+			set({ 
+				stockHistory: response.data,
+				stockHistoryPage: response.page,
+				stockHistoryTotalPages: response.totalPages,
+				stockHistoryTotal: response.total,
+			});
 		} catch (error: any) {
 			console.error('Failed to fetch stock history:', error);
 			// Don't throw error for history, just log it
@@ -262,11 +282,17 @@ export const useRestaurantStore = create<RestaurantStore>((set, get) => ({
 	},
 
 	// === Orders ===
-	fetchOrders: async () => {
+	fetchOrders: async (params?: PaginationParams) => {
 		set({ isLoading: true, error: null });
 		try {
-			const orders = await ordersService.getAll();
-			set({ orders, isLoading: false });
+			const response = await ordersService.getAll(params);
+			set({ 
+				orders: response.data, 
+				ordersPage: response.page,
+				ordersTotalPages: response.totalPages,
+				ordersTotal: response.total,
+				isLoading: false 
+			});
 		} catch (error: any) {
 			set({ error: error.message || 'Failed to fetch orders', isLoading: false });
 			throw error;

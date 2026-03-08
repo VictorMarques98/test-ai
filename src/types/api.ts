@@ -209,6 +209,7 @@ export interface Tenant {
   id: string;
   name: string;
   type?: 'kds' | string;
+  blockSaleWhenOutOfStock?: boolean;
   created_at?: string;
   updated_at?: string;
   /** Included when GET /tenants returns embedded users */
@@ -219,6 +220,27 @@ export interface Tenant {
 export interface CreateTenantDto {
   name: string;
   type?: 'kds';
+}
+
+/** Update tenant: PATCH /tenants/{id} */
+export interface UpdateTenantDto {
+  name?: string;
+  type?: 'kds';
+  blockSaleWhenOutOfStock?: boolean;
+}
+
+// === Pagination Types ===
+export interface PaginationParams {
+  page?: number; // 1-based page number (default: 1)
+  limit?: number; // Items per page (default: 20, max: 100)
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number; // Total count of items
+  page: number; // Current page (1-based)
+  limit: number; // Items per page
+  totalPages: number; // Total number of pages
 }
 
 // === API Response Types ===

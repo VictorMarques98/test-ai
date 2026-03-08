@@ -20,6 +20,8 @@ export type {
 	OrderProduct,
 	OrderStatus,
 	ApiError,
+	PaginationParams,
+	PaginatedResponse,
 } from './api';
 
 // Legacy types for UI components (if still needed)

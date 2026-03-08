@@ -1,10 +1,11 @@
 import apiClient from "@/lib/api";
-import type { Tenant, CreateTenantDto } from "@/types/api";
+import type { Tenant, CreateTenantDto, UpdateTenantDto } from "@/types/api";
 
 /**
  * Tenants Service
  * GET /tenants - list tenants (for admin context switch)
  * POST /tenants - create tenant (admin)
+ * PATCH /tenants/{id} - update tenant (admin or manager for own tenant)
  */
 export const tenantsService = {
   async getTenants(): Promise<Tenant[]> {
@@ -14,6 +15,11 @@ export const tenantsService = {
 
   async createTenant(data: CreateTenantDto): Promise<Tenant> {
     const response = await apiClient.post<Tenant>("/tenants", data);
+    return response.data;
+  },
+
+  async updateTenant(id: string, data: UpdateTenantDto): Promise<Tenant> {
+    const response = await apiClient.patch<Tenant>(`/tenants/${id}`, data);
     return response.data;
   },
 };
