@@ -5,6 +5,20 @@
 // Unit types supported by the API
 export type UnitType = "grams" | "unit" | "ml" | "liters" | "kg";
 
+// === Pagination Types ===
+export interface PaginationParams {
+  page?: number; // 1-based page number (default: 1)
+  limit?: number; // Items per page (default: 20, max: 100)
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number; // Total count of items
+  page: number; // Current page (1-based)
+  limit: number; // Items per page
+  totalPages: number; // Total number of pages
+}
+
 // Items (basic ingredients/materials)
 export interface BackendItem {
 	id: string; // UUID

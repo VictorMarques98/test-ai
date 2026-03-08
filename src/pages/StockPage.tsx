@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { useRestaurantStore } from "@/store/restaurantStoreApi";
 import type { UnitType } from "@/types/api";
 import {
@@ -73,6 +74,9 @@ export default function StockPage() {
 		items,
 		stock,
 		stockHistory,
+		stockHistoryPage,
+		stockHistoryTotalPages,
+		stockHistoryTotal,
 		isLoading, 
 		error, 
 		fetchItems,
@@ -126,6 +130,11 @@ export default function StockPage() {
 	};
 	const resetEditForm = () => {
 		editForm.reset(EDIT_DEFAULT_VALUES);
+	};
+
+	const handleStockHistoryPageChange = (newPage: number) => {
+		if (newPage < 1 || newPage > stockHistoryTotalPages) return;
+		fetchStockHistory({ page: newPage, limit: 20 });
 	};
 
 	const handleStockOperation = async () => {
@@ -877,6 +886,59 @@ export default function StockPage() {
 										</TableBody>
 									</Table>
 								</div>
+
+								{/* Pagination for Stock History */}
+								{stockHistoryTotalPages > 1 && (
+									<div className="flex items-center justify-between mt-4 px-6 pb-4">
+										<div className="text-sm text-muted-foreground">
+											Mostrando {stockHistory.length} de {stockHistoryTotal} registros
+										</div>
+										<Pagination>
+											<PaginationContent>
+												<PaginationItem>
+													<PaginationPrevious 
+														onClick={() => handleStockHistoryPageChange(stockHistoryPage - 1)}
+														className={stockHistoryPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+													/>
+												</PaginationItem>
+												{[...Array(stockHistoryTotalPages)].map((_, i) => {
+													const pageNum = i + 1;
+													// Show first page, last page, current page, and pages around current
+													if (
+														pageNum === 1 ||
+														pageNum === stockHistoryTotalPages ||
+														(pageNum >= stockHistoryPage - 1 && pageNum <= stockHistoryPage + 1)
+													) {
+														return (
+															<PaginationItem key={pageNum}>
+																<PaginationLink
+																	onClick={() => handleStockHistoryPageChange(pageNum)}
+																	isActive={pageNum === stockHistoryPage}
+																	className="cursor-pointer"
+																>
+																	{pageNum}
+																</PaginationLink>
+															</PaginationItem>
+														);
+													} else if (pageNum === stockHistoryPage - 2 || pageNum === stockHistoryPage + 2) {
+														return (
+															<PaginationItem key={pageNum}>
+																<PaginationEllipsis />
+															</PaginationItem>
+														);
+													}
+													return null;
+												})}
+												<PaginationItem>
+													<PaginationNext 
+														onClick={() => handleStockHistoryPageChange(stockHistoryPage + 1)}
+														className={stockHistoryPage >= stockHistoryTotalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+													/>
+												</PaginationItem>
+											</PaginationContent>
+										</Pagination>
+									</div>
+								)}
 							</CardContent>
 						</Card>
 					)}

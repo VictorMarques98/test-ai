@@ -16,6 +16,8 @@ import type {
 	BackendOrder,
 	CreateOrderDto,
 	UpdateOrderStatusDto,
+	PaginationParams,
+	PaginatedResponse,
 } from "@/types/backend";
 
 /**
@@ -82,10 +84,16 @@ export const itemsAPI = {
 export const customersAPI = {
 	/**
 	 * GET /customers
-	 * List all customers
+	 * List customers with pagination support
+	 * @param params - Optional pagination parameters (page, limit)
+	 * @returns Paginated response or array (for backward compatibility)
 	 */
-	async getAll(): Promise<BackendCustomer[]> {
-		const response = await apiClient.get<BackendCustomer[]>("/customers");
+	async getAll(params?: PaginationParams): Promise<PaginatedResponse<BackendCustomer>> {
+		const queryParams = new URLSearchParams();
+		if (params?.page) queryParams.set('page', params.page.toString());
+		if (params?.limit) queryParams.set('limit', params.limit.toString());
+		const url = queryParams.toString() ? `/customers?${queryParams}` : '/customers';
+		const response = await apiClient.get<PaginatedResponse<BackendCustomer>>(url);
 		return response.data;
 	},
 
@@ -182,11 +190,16 @@ export const stockAPI = {
 
 	/**
 	 * GET /stock/history
-	 * List all stock history entries, newest first
-	 * Returns: id, stock_id, quantity, operation, item_name, created_at (DESC)
+	 * List stock history entries with pagination, newest first
+	 * @param params - Optional pagination parameters (page, limit)
+	 * @returns Paginated response of history entries
 	 */
-	async getHistory(): Promise<StockHistoryEntry[]> {
-		const response = await apiClient.get<StockHistoryEntry[]>("/stock/history");
+	async getHistory(params?: PaginationParams): Promise<PaginatedResponse<StockHistoryEntry>> {
+		const queryParams = new URLSearchParams();
+		if (params?.page) queryParams.set('page', params.page.toString());
+		if (params?.limit) queryParams.set('limit', params.limit.toString());
+		const url = queryParams.toString() ? `/stock/history?${queryParams}` : '/stock/history';
+		const response = await apiClient.get<PaginatedResponse<StockHistoryEntry>>(url);
 		return response.data;
 	},
 };
@@ -252,10 +265,16 @@ export const productsAPI = {
 export const ordersAPI = {
 	/**
 	 * GET /orders
-	 * List all orders in the system
+	 * List orders with pagination support
+	 * @param params - Optional pagination parameters (page, limit)
+	 * @returns Paginated response or array (for backward compatibility)
 	 */
-	async getAll(): Promise<BackendOrder[]> {
-		const response = await apiClient.get<BackendOrder[]>("/orders");
+	async getAll(params?: PaginationParams): Promise<PaginatedResponse<BackendOrder>> {
+		const queryParams = new URLSearchParams();
+		if (params?.page) queryParams.set('page', params.page.toString());
+		if (params?.limit) queryParams.set('limit', params.limit.toString());
+		const url = queryParams.toString() ? `/orders?${queryParams}` : '/orders';
+		const response = await apiClient.get<PaginatedResponse<BackendOrder>>(url);
 		return response.data;
 	},
 

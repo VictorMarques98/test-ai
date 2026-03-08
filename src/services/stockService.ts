@@ -1,5 +1,5 @@
 import apiClient from '@/lib/api';
-import { Stock, CreateStockDto, UpdateStockDto } from '@/types/api';
+import { Stock, CreateStockDto, UpdateStockDto, PaginationParams, PaginatedResponse } from '@/types/api';
 import type { StockHistoryEntry } from '@/types/backend';
 
 /**
@@ -49,10 +49,15 @@ export const stockService = {
   },
 
   /**
-   * Get stock movement history
+   * Get stock history with pagination
+   * @param params - Optional pagination parameters (page, limit)
    */
-  async getHistory(): Promise<StockHistoryEntry[]> {
-    const response = await apiClient.get<StockHistoryEntry[]>('/stock/history');
+  async getHistory(params?: PaginationParams): Promise<PaginatedResponse<StockHistoryEntry>> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.set('page', params.page.toString());
+    if (params?.limit) queryParams.set('limit', params.limit.toString());
+    const url = queryParams.toString() ? `/stock/history?${queryParams}` : '/stock/history';
+    const response = await apiClient.get<PaginatedResponse<StockHistoryEntry>>(url);
     return response.data;
   },
 };

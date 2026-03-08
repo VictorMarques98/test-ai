@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Pencil, Users, Search, ShoppingBag, Clock, CheckCircle2, X, Loader2, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { showSuccessToast, showErrorToast } from "@/lib/toastUtils";
 import { ConfirmDiscardDialog } from "@/components/ConfirmDiscardDialog";
 import { ConfirmActionDialog } from "@/components/ConfirmActionDialog";
@@ -30,7 +31,7 @@ const CLIENT_DEFAULT_VALUES: ClientFormValues = {
 
 export default function ClientsPage() {
 	const location = useLocation();
-	const { customers, loading, error, createCustomer, updateCustomer, deleteCustomer } = useCustomers();
+	const { customers, loading, error, page, totalPages, total, fetchCustomers, setPage, createCustomer, updateCustomer, deleteCustomer } = useCustomers();
 	const [open, setOpen] = useState(false);
 	const [editId, setEditId] = useState<string | null>(null);
 	const [search, setSearch] = useState("");
@@ -78,6 +79,12 @@ export default function ClientsPage() {
 			newExpanded.add(id);
 		}
 		setExpandedRows(newExpanded);
+	};
+
+	const handlePageChange = (newPage: number) => {
+		if (newPage < 1 || newPage > totalPages) return;
+		setPage(newPage);
+		fetchCustomers({ page: newPage, limit: 20 });
 	};
 
 	const handleSubmit = async () => {
@@ -520,6 +527,59 @@ export default function ClientsPage() {
 							</TableBody>
 						</Table>
 					</CardContent>
+
+					{/* Pagination */}
+					{totalPages > 1 && (
+						<div className="flex items-center justify-between p-4 border-t">
+							<div className="text-sm text-muted-foreground">
+								Mostrando {customers.length} de {total} clientes
+							</div>
+							<Pagination>
+								<PaginationContent>
+									<PaginationItem>
+										<PaginationPrevious 
+											onClick={() => handlePageChange(page - 1)}
+											className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+										/>
+									</PaginationItem>
+									{[...Array(totalPages)].map((_, i) => {
+										const pageNum = i + 1;
+										// Show first page, last page, current page, and pages around current
+										if (
+											pageNum === 1 ||
+											pageNum === totalPages ||
+											(pageNum >= page - 1 && pageNum <= page + 1)
+										) {
+											return (
+												<PaginationItem key={pageNum}>
+													<PaginationLink
+														onClick={() => handlePageChange(pageNum)}
+														isActive={pageNum === page}
+														className="cursor-pointer"
+													>
+														{pageNum}
+													</PaginationLink>
+												</PaginationItem>
+											);
+										} else if (pageNum === page - 2 || pageNum === page + 2) {
+											return (
+												<PaginationItem key={pageNum}>
+													<PaginationEllipsis />
+												</PaginationItem>
+											);
+										}
+										return null;
+									})}
+									<PaginationItem>
+										<PaginationNext 
+											onClick={() => handlePageChange(page + 1)}
+											className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+										/>
+									</PaginationItem>
+								</PaginationContent>
+							</Pagination>
+						</div>
+					)}
 				</Card>
 			)}
 		</div>

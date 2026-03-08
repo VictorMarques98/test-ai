@@ -1,5 +1,5 @@
 import apiClient from '@/lib/api';
-import { Order, CreateOrderDto, UpdateOrderDto, UpdateOrderStatusDto } from '@/types/api';
+import { Order, CreateOrderDto, UpdateOrderDto, UpdateOrderStatusDto, PaginationParams, PaginatedResponse } from '@/types/api';
 
 /**
  * Orders Service
@@ -8,10 +8,15 @@ import { Order, CreateOrderDto, UpdateOrderDto, UpdateOrderStatusDto } from '@/t
 
 export const ordersService = {
   /**
-   * Get all orders
+   * Get all orders with pagination support
+   * @param params - Optional pagination parameters (page, limit)
    */
-  async getAll(): Promise<Order[]> {
-    const response = await apiClient.get<Order[]>('/orders');
+  async getAll(params?: PaginationParams): Promise<PaginatedResponse<Order>> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.set('page', params.page.toString());
+    if (params?.limit) queryParams.set('limit', params.limit.toString());
+    const url = queryParams.toString() ? `/orders?${queryParams}` : '/orders';
+    const response = await apiClient.get<PaginatedResponse<Order>>(url);
     return response.data;
   },
 

@@ -1,23 +1,33 @@
 import { useState, useEffect, useCallback } from "react";
 import { customersAPI } from "@/lib/apiService";
-import type { BackendCustomer, CreateCustomerDto, UpdateCustomerDto } from "@/types/backend";
+import type { BackendCustomer, CreateCustomerDto, UpdateCustomerDto, PaginationParams, PaginatedResponse } from "@/types/backend";
 
 /**
  * Hook for managing customers with API integration
  * Provides CRUD operations with loading and error states
+ * Supports pagination
  */
 export function useCustomers() {
 	const [customers, setCustomers] = useState<BackendCustomer[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [page, setPage] = useState(1);
+	const [limit, setLimit] = useState(20);
+	const [totalPages, setTotalPages] = useState(1);
+	const [total, setTotal] = useState(0);
 
-	// Fetch all customers
-	const fetchCustomers = useCallback(async () => {
+	// Fetch customers with pagination
+	const fetchCustomers = useCallback(async (paginationParams?: PaginationParams) => {
 		try {
 			setLoading(true);
 			setError(null);
-			const data = await customersAPI.getAll();
-			setCustomers(data);
+			const params = paginationParams || { page, limit };
+			const response = await customersAPI.getAll(params);
+			setCustomers(response.data);
+			setPage(response.page);
+			setLimit(response.limit);
+			setTotalPages(response.totalPages);
+			setTotal(response.total);
 		} catch (err: any) {
 			const errorMessage = err.message || "Erro ao carregar clientes";
 			setError(errorMessage);
@@ -25,7 +35,7 @@ export function useCustomers() {
 		} finally {
 			setLoading(false);
 		}
-	}, []);
+	}, [page, limit]);
 
 	// Create new customer
 	const createCustomer = useCallback(
@@ -86,7 +96,13 @@ export function useCustomers() {
 		customers,
 		loading,
 		error,
+		page,
+		limit,
+		totalPages,
+		total,
 		fetchCustomers,
+		setPage,
+		setLimit,
 		createCustomer,
 		updateCustomer,
 		deleteCustomer,

@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useRestaurantStore } from "@/store/restaurantStoreApi";
 import type { Order } from "@/types/api";
@@ -67,6 +68,9 @@ export default function OrdersPage() {
     products,
     isLoading,
     error,
+    ordersPage,
+    ordersTotalPages,
+    ordersTotal,
     fetchOrders,
     fetchProducts,
     createOrder,
@@ -131,6 +135,11 @@ export default function OrdersPage() {
     setSelectedOrderIds(new Set(sortedOrders.map((o) => o.id)));
 
   const clearSelection = () => setSelectedOrderIds(new Set());
+
+  const handleOrdersPageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > ordersTotalPages) return;
+    fetchOrders({ page: newPage, limit: 20 });
+  };
 
   // Create new customer function
   const handleCreateCustomer = async () => {
@@ -1369,6 +1378,60 @@ export default function OrdersPage() {
           })}
         </div>
       )}
+
+      {/* Pagination */}
+      {ordersTotalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-muted-foreground">
+            Mostrando {orders.length} de {ordersTotal} pedidos
+          </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => handleOrdersPageChange(ordersPage - 1)}
+                  className={ordersPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+              {[...Array(ordersTotalPages)].map((_, i) => {
+                const pageNum = i + 1;
+                // Show first page, last page, current page, and pages around current
+                if (
+                  pageNum === 1 ||
+                  pageNum === ordersTotalPages ||
+                  (pageNum >= ordersPage - 1 && pageNum <= ordersPage + 1)
+                ) {
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => handleOrdersPageChange(pageNum)}
+                        isActive={pageNum === ordersPage}
+                        className="cursor-pointer"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                } else if (pageNum === ordersPage - 2 || pageNum === ordersPage + 2) {
+                  return (
+                    <PaginationItem key={pageNum}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  );
+                }
+                return null;
+              })}
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => handleOrdersPageChange(ordersPage + 1)}
+                  className={ordersPage >= ordersTotalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
       {/* Hidden single-order print template */}
       {orderToPrint && (
         <div style={{ display: "none" }}>
